@@ -115,6 +115,11 @@ input, select, button { font: inherit; color: inherit; }
 }
 .text-btn:hover { color: var(--ink); }
 
+button:disabled { opacity: 0.5; cursor: default; }
+
+main { transition: opacity 0.2s; }
+body.loading main { opacity: 0.45; }
+
 /* ---------- Hero ---------- */
 
 .hero {
