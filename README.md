@@ -1,35 +1,61 @@
-# 🕌 Prayer Times & Qibla
+# Salah — Prayer Times, Quran & Qibla
 
-A simple, mobile-friendly website that shows today's prayer times for any city and the Qibla direction.
+A calm, mobile-friendly Islamic companion site: prayer times for any city, the Qibla direction, the Holy Quran with translations and recitation, a tasbih counter and an Islamic calendar.
 
 ## Features
 
-- Today's prayer times (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha)
-- Next prayer highlighted with a live countdown, including tomorrow's Fajr after Isha
+### Prayer times (`index.html`)
+- Today's times (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha) for any city or your device location
+- Next prayer with a live countdown, including tomorrow's Fajr after Isha
+- Sky that changes with the time of day, and a sun path from Fajr to Isha
 - Gregorian and Hijri dates; rolls over to the new day at midnight
-- Search by city, or use your device location (shown as a city name)
-- Times are always for the selected city's own timezone
-- Calculation method and Asr school (Hanafi / Standard) settings
-- Qibla bearing, plus a live compass on phones that tells you which way to turn
-- Remembers your last location and settings
+- Calculation method and Asr school (Hanafi / Standard)
+- **Prayer alerts** — a chime, an on-page banner and a browser notification at each prayer time (while the page is open)
+- **Ramadan mode** — shows when Sehri ends and Iftar begins during Ramadan
+- **Verse of the Day** — a real verse in Arabic with English and Urdu translation and recitation
+- Qibla bearing and a live compass on phones that tells you which way to turn
 - Shareable links, e.g. `?city=Karachi&country=Pakistan`
-- Clear error messages for unknown cities, denied location and lost connection
-- Automatic dark mode
+
+### Quran (`quran.html`)
+- All 114 surahs with Arabic names, meanings, verse counts and Makki/Madani
+- Reader with Uthmani Arabic text, Saheeh International (English) and Fateh Muhammad Jalandhry (Urdu)
+- Choose English, Urdu, both or Arabic only; adjustable Arabic text size
+- Recitation by Mishary Alafasy, Abdul Basit, As-Sudais, Al-Husary or Maher Al-Muaiqly — play a whole surah or from any verse, with the current verse highlighted
+- Bookmarks, "Continue reading" and links to any verse (`quran.html?surah=18#ayah-10`)
+- Search the whole Quran in English or Urdu
+
+### Tasbih (`tasbih.html`)
+- After-prayer mode: SubhanAllah 33, Alhamdulillah 33, Allahu Akbar 34
+- Free count with a choice of dhikr and target, undo, reset, and today / all-time totals
+- Tap, Space or Enter to count; vibrates on phones
+
+### Calendar (`calendar.html`)
+- Ramadan countdown (or the current day of Ramadan)
+- Upcoming Islamic dates: Islamic New Year, Ashura, Mawlid, Isra and Mi'raj, Shab-e-Barat, Ramadan, Laylat al-Qadr, Eid al-Fitr, Arafah, Eid al-Adha
+- Printable monthly prayer timetable for your city
+
+Plus light/dark mode on every page, remembered in the browser.
+
+## Data sources
+
+- Prayer times: [Aladhan API](https://aladhan.com/prayer-times-api)
+- Quran text, translations, audio and search: [AlQuran.cloud API](https://alquran.cloud/api) — verses are always loaded from the API, never typed by hand
+- City search: [Open-Meteo Geocoding](https://open-meteo.com/en/docs/geocoding-api)
+- Device location names: [BigDataCloud](https://www.bigdatacloud.com/free-api/free-reverse-geocode-to-city-api)
+- Islamic dates are calculated in the browser with the Umm al-Qura calendar and may differ by a day from local moon sighting.
 
 ## Tech
 
-Plain HTML, CSS and JavaScript — no build step. Prayer times come from the free [Aladhan API](https://aladhan.com/prayer-times-api), city names are turned into coordinates with [Open-Meteo Geocoding](https://open-meteo.com/en/docs/geocoding-api), and device locations are named with [BigDataCloud](https://www.bigdatacloud.com/free-api/free-reverse-geocode-to-city-api). The Qibla bearing is calculated in the browser.
+Plain HTML, CSS and JavaScript — no build step. `common.js` holds code shared by every page.
 
 ## Run locally
-
-Open `index.html` in a browser, or serve the folder:
 
 ```bash
 python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
-> Location and the live compass need HTTPS (or localhost) to work.
+> Location, notifications and the live compass need HTTPS (or localhost) to work.
 
 ## Deploy with GitHub Pages
 

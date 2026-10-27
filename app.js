@@ -1,5 +1,3 @@
-const API = "https://api.aladhan.com/v1";
-const GEOCODE_API = "https://geocoding-api.open-meteo.com/v1/search";
 const REVERSE_GEOCODE_API = "https://api.bigdatacloud.net/data/reverse-geocode-client";
 const PRAYERS = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
 const ARABIC = {
@@ -11,10 +9,7 @@ const ARABIC = {
   Isha: "العشاء",
 };
 const KAABA = { lat: 21.4225, lng: 39.8262 };
-const STORAGE_KEY = "prayer-times-settings";
-const DEFAULT_CITY = { city: "Lahore", country: "Pakistan" };
-
-const $ = (id) => document.getElementById(id);
+const TOTAL_AYAHS = 6236;
 
 let state = {
   place: null,     // { lat, lng, label, city, country, timezone }
@@ -26,56 +21,7 @@ let state = {
 let requestId = 0;
 let countdownTimer = null;
 
-// ---------- Settings (saved in the browser) ----------
-
-function loadSettings() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  } catch {
-    return {};
-  }
-}
-
-function saveSettings(update) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...loadSettings(), ...update }));
-  } catch {
-    // Storage may be blocked (private mode); the app still works.
-  }
-}
-
 // ---------- Network ----------
-
-async function getJSON(url) {
-  let res;
-  try {
-    res = await fetch(url);
-  } catch {
-    throw new Error("Network error. Check your internet connection and try again.");
-  }
-  const json = await res.json().catch(() => null);
-  if (!res.ok || !json) throw new Error(json?.data || `Service returned ${res.status}. Please try again.`);
-  return json;
-}
-
-// City name -> coordinates and timezone (Aladhan's city endpoint returns
-// placeholder coordinates, and we need real ones for the Qibla).
-async function geocode(city, country) {
-  const { results } = await getJSON(`${GEOCODE_API}?name=${encodeURIComponent(city)}&count=10&language=en`);
-  if (!results?.length) throw new Error(`Couldn't find "${city}". Check the spelling and try again.`);
-  const wanted = country.toLowerCase();
-  const match =
-    results.find((r) => r.country?.toLowerCase() === wanted || r.country_code?.toLowerCase() === wanted) ||
-    results[0];
-  return {
-    lat: match.latitude,
-    lng: match.longitude,
-    city: match.name,
-    country: match.country,
-    label: `${match.name}, ${match.country}`,
-    timezone: match.timezone,
-  };
-}
 
 function getPosition() {
   return new Promise((resolve, reject) => {
@@ -125,7 +71,7 @@ async function fetchDay(place, date) {
     school: $("school").value,
     timezonestring: place.timezone,
   });
-  const json = await getJSON(`${API}/timings/${date}?${params}`);
+  const json = await getJSON(`${ALADHAN_API}/timings/${date}?${params}`);
   if (json.code !== 200) throw new Error(json.data || "Could not load prayer times.");
   return json.data;
 }
@@ -164,19 +110,6 @@ async function update(getPlace) {
 
 // ---------- Time helpers ----------
 
-function partsIn(timeZone, options) {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, ...options }).formatToParts(new Date());
-  return (type) => Number(parts.find((p) => p.type === type).value);
-}
-
-// Date in the given timezone as "DD-MM-YYYY", optionally shifted by whole days
-function dateIn(timeZone, addDays = 0) {
-  const get = partsIn(timeZone, { year: "numeric", month: "2-digit", day: "2-digit" });
-  const d = new Date(Date.UTC(get("year"), get("month") - 1, get("day") + addDays));
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()}`;
-}
-
 // Current time of day (in seconds) in the place's timezone
 function nowSeconds() {
   const get = partsIn(state.place.timezone, {
@@ -186,18 +119,6 @@ function nowSeconds() {
     hourCycle: "h23",
   });
   return get("hour") * 3600 + get("minute") * 60 + get("second");
-}
-
-// "05:12" or "05:12 (PKT)" -> seconds since midnight
-function toSeconds(time) {
-  const [h, m] = time.split(" ")[0].split(":").map(Number);
-  return h * 3600 + m * 60;
-}
-
-// "15:41" -> ["3:41", "PM"]
-function to12h(time) {
-  const [h, m] = time.split(" ")[0].split(":").map(Number);
-  return [`${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")}`, h >= 12 ? "PM" : "AM"];
 }
 
 function formatDuration(sec) {
@@ -241,11 +162,20 @@ function syncUrl(place) {
 }
 
 function renderHeader() {
-  const { date } = state.today;
+  const { date, timings } = state.today;
   $("location").textContent = state.place.label;
   $("dates").innerHTML =
     `${date.gregorian.weekday.en}, ${date.readable}` +
     `<span class="hijri">${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH</span>`;
+
+  // During Ramadan, show when Sehri ends (Fajr) and Iftar begins (Maghrib).
+  const ramadan = date.hijri.month.number === 9;
+  $("ramadan").hidden = !ramadan;
+  if (ramadan) {
+    $("ramadan").textContent =
+      `Ramadan day ${Number(date.hijri.day)} · Sehri ends ${to12h(timings.Fajr).join(" ")} · ` +
+      `Iftar ${to12h(timings.Maghrib).join(" ")}`;
+  }
 }
 
 function renderTimes() {
@@ -349,6 +279,7 @@ function startCountdown() {
       update(() => state.place);
       return;
     }
+    checkAlerts();
     const next = nextPrayer();
     $("countdown").textContent = formatDuration(next.remaining);
     $("hero").dataset.period = currentPeriod();
@@ -365,6 +296,175 @@ function startCountdown() {
   };
   tick();
   countdownTimer = setInterval(tick, 1000);
+}
+
+// ---------- Prayer alerts ----------
+
+const alerts = { on: readStore("prayer-alerts", false) === true, fired: new Set(), ctx: null };
+
+function renderAlertsButton() {
+  $("alerts-btn").textContent = `Prayer alerts: ${alerts.on ? "On" : "Off"}`;
+  $("alerts-btn").setAttribute("aria-pressed", String(alerts.on));
+  $("alerts-test").hidden = !alerts.on;
+}
+
+function notificationsAllowed() {
+  return "Notification" in window && Notification.permission === "granted";
+}
+
+// Audio needs a user gesture before it can play, so this is first called from a click.
+function audioContext() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  alerts.ctx ??= new Ctx();
+  if (alerts.ctx.state === "suspended") alerts.ctx.resume();
+  return alerts.ctx;
+}
+
+// A soft three-note bell, synthesised so no audio file is needed.
+function playChime() {
+  const ctx = audioContext();
+  if (!ctx) return;
+  [0, 0.9, 1.8].forEach((offset, i) => {
+    const base = i === 2 ? 495 : 660;
+    for (const [mult, peak] of [[1, 0.16], [1.5, 0.06], [2, 0.03]]) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const t = ctx.currentTime + offset;
+      osc.type = "sine";
+      osc.frequency.value = base * mult;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(peak, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 2.5);
+    }
+  });
+}
+
+function announcePrayer(name) {
+  playChime();
+  $("prayer-banner-text").textContent = `It's time for ${name} (${ARABIC[name]}) in ${state.place.label}.`;
+  $("prayer-banner").hidden = false;
+  if (notificationsAllowed()) {
+    new Notification(`Time for ${name}`, {
+      body: `${name} has begun in ${state.place.label}.`,
+      tag: `prayer-${name}`,
+    });
+  }
+}
+
+// Fire once per prayer, within the first minute of its time.
+function checkAlerts() {
+  if (!alerts.on) return;
+  const now = nowSeconds();
+  for (const name of PRAYERS) {
+    if (name === "Sunrise") continue;
+    const t = toSeconds(state.today.timings[name]);
+    const key = `${state.dateKey}-${name}`;
+    if (now >= t && now - t < 60 && !alerts.fired.has(key)) {
+      alerts.fired.add(key);
+      announcePrayer(name);
+    }
+  }
+}
+
+async function toggleAlerts() {
+  alerts.on = !alerts.on;
+  writeStore("prayer-alerts", alerts.on);
+  renderAlertsButton();
+  if (!alerts.on) return toast("Prayer alerts turned off.");
+
+  audioContext();
+  if ("Notification" in window && Notification.permission === "default") {
+    await Notification.requestPermission();
+  }
+  toast(
+    notificationsAllowed()
+      ? "You'll get a notification and a chime at each prayer time while this page is open."
+      : "You'll hear a chime at each prayer time while this page is open. Allow notifications to get pop-ups too.",
+    5000
+  );
+}
+
+// ---------- Verse of the day ----------
+
+let verse = null;
+const verseAudio = new Audio();
+
+// Same verse for everyone on a given day; stepping by a number coprime
+// with 6236 visits every verse before repeating.
+function verseOfTheDayNumber() {
+  const now = new Date();
+  const day = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
+  return ((day * 2621) % TOTAL_AYAHS) + 1;
+}
+
+function applyTranslationSetting(root) {
+  const { translation } = quranSettings();
+  root.classList.toggle("hide-en", translation === "ur" || translation === "none");
+  root.classList.toggle("hide-ur", translation === "en" || translation === "none");
+}
+
+async function loadVerseOfTheDay() {
+  const { reciter } = quranSettings();
+  applyTranslationSetting($("verse"));
+  try {
+    const { data } = await getJSON(
+      `${QURAN_API}/ayah/${verseOfTheDayNumber()}/editions/${TEXT_EDITIONS},${reciter}`
+    );
+    const [ar, en, ur, audio] = data;
+    const surah = ar.surah;
+    const ayah = ar.numberInSurah;
+    verse = {
+      surah: surah.number,
+      ayah,
+      name: surah.englishName,
+      ar: splitBasmala(ar.text, surah.number, ayah).text,
+      en: en.text,
+      ur: ur.text,
+      audio: audio.audio,
+    };
+    const link = `quran.html?surah=${verse.surah}#ayah-${ayah}`;
+    $("verse-ref").textContent = `${surah.englishName} ${verse.surah}:${ayah}`;
+    $("verse-ref").href = link;
+    $("verse-link").href = link;
+    $("verse-ar").textContent = verse.ar;
+    $("verse-en").textContent = verse.en;
+    $("verse-ur").textContent = verse.ur;
+    verseAudio.src = verse.audio;
+    $("verse-play").disabled = false;
+    $("verse-copy").disabled = false;
+  } catch (err) {
+    $("verse-ar").textContent = "";
+    $("verse-en").textContent = `Couldn't load today's verse. ${err.message}`;
+  }
+}
+
+function toggleVerseAudio() {
+  if (verseAudio.paused) {
+    verseAudio.play().catch(() => toast("Couldn't play the recitation."));
+  } else {
+    verseAudio.pause();
+  }
+}
+
+verseAudio.addEventListener("play", () => ($("verse-play").textContent = "Pause recitation"));
+verseAudio.addEventListener("pause", () => ($("verse-play").textContent = "Play recitation"));
+verseAudio.addEventListener("ended", () => {
+  verseAudio.currentTime = 0;
+  $("verse-play").textContent = "Play recitation";
+});
+
+async function copyVerse() {
+  const { translation } = quranSettings();
+  const parts = [verse.ar];
+  if (translation === "en" || translation === "both") parts.push(verse.en);
+  if (translation === "ur" || translation === "both") parts.push(verse.ur);
+  parts.push(`— Quran ${verse.surah}:${verse.ayah} (${verse.name})`);
+  await copyText(parts.join("\n\n"));
+  toast("Verse copied.");
 }
 
 // ---------- Qibla ----------
@@ -484,38 +584,7 @@ async function toggleCompass() {
   }, 3000);
 }
 
-// ---------- Theme ----------
-
-const darkQuery = matchMedia("(prefers-color-scheme: dark)");
-
-// The user's choice if they made one, otherwise the system setting
-function currentTheme() {
-  return document.documentElement.dataset.theme || (darkQuery.matches ? "dark" : "light");
-}
-
-function renderThemeButton() {
-  const dark = currentTheme() === "dark";
-  const label = dark ? "Switch to light mode" : "Switch to dark mode";
-  $("theme-btn").classList.toggle("is-dark", dark);
-  $("theme-btn").setAttribute("aria-label", label);
-  $("theme-btn").title = label;
-}
-
-function toggleTheme() {
-  const theme = currentTheme() === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = theme;
-  try {
-    localStorage.setItem("theme", theme);
-  } catch {
-    // Storage may be blocked; the theme still applies for this visit.
-  }
-  renderThemeButton();
-}
-
 // ---------- Events ----------
-
-$("theme-btn").addEventListener("click", toggleTheme);
-darkQuery.addEventListener("change", renderThemeButton);
 
 $("city-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -526,6 +595,13 @@ $("city-form").addEventListener("submit", (e) => {
 
 $("gps-btn").addEventListener("click", () => update(locate));
 $("compass-btn").addEventListener("click", toggleCompass);
+$("alerts-btn").addEventListener("click", toggleAlerts);
+$("alerts-test").addEventListener("click", () => {
+  if (state.place) announcePrayer(nextPrayer().name);
+});
+$("prayer-banner-close").addEventListener("click", () => ($("prayer-banner").hidden = true));
+$("verse-play").addEventListener("click", toggleVerseAudio);
+$("verse-copy").addEventListener("click", copyVerse);
 
 for (const id of ["method", "school"]) {
   $(id).addEventListener("change", () => {
@@ -538,7 +614,8 @@ for (const id of ["method", "school"]) {
 
 (function init() {
   drawDial();
-  renderThemeButton();
+  renderAlertsButton();
+  loadVerseOfTheDay();
 
   const saved = loadSettings();
   if (saved.method) $("method").value = saved.method;

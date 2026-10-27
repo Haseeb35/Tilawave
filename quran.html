@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quran — Salah</title>
+  <meta name="description" content="Read, listen to and search the Holy Quran with English and Urdu translations.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23161613'/%3E%3Cpath d='M20 8a9 9 0 1 0 0 16a7 7 0 1 1 0-16z' fill='%23f6f4ef'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Noto+Naskh+Arabic:wght@400&family=Amiri+Quran&family=Noto+Nastaliq+Urdu:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      const theme = localStorage.getItem("theme");
+      if (theme) document.documentElement.dataset.theme = theme;
+    } catch {}
+  </script>
+</head>
+<body data-page="quran">
+  <header class="topbar">
+    <a class="brand" href="./">Salah</a>
+    <nav class="nav" aria-label="Main">
+      <a href="./" data-page="home">Prayer times</a>
+      <a href="quran.html" data-page="quran">Quran</a>
+      <a href="tasbih.html" data-page="tasbih">Tasbih</a>
+      <a href="calendar.html" data-page="calendar">Calendar</a>
+    </nav>
+    <button id="theme-btn" class="icon-btn" type="button" aria-label="Switch theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+    </button>
+  </header>
+
+  <!-- Surah index, search and bookmarks -->
+  <main id="index-view">
+    <section class="page-head">
+      <p class="arabic-title" lang="ar" dir="rtl">القرآن الكريم</p>
+      <h1>The Holy Quran</h1>
+      <form id="search-form" class="quran-search">
+        <input id="search-q" type="search" placeholder="Search the Quran, e.g. patience" aria-label="Search the Quran" required>
+        <select id="search-lang" aria-label="Search language">
+          <option value="en.sahih">English</option>
+          <option value="ur.jalandhry">Urdu</option>
+        </select>
+        <button type="submit">Search</button>
+      </form>
+    </section>
+
+    <a id="continue" class="continue card" hidden></a>
+
+    <section id="results" class="results" hidden>
+      <div class="section-head">
+        <h2>Search results</h2>
+        <button id="results-clear" class="text-btn" type="button">Clear</button>
+      </div>
+      <p id="results-summary" class="muted"></p>
+      <ol id="results-list" class="result-list"></ol>
+    </section>
+
+    <section id="bookmarks" class="bookmarks" hidden>
+      <div class="section-head"><h2>Bookmarks</h2></div>
+      <ul id="bookmarks-list" class="bookmark-list"></ul>
+    </section>
+
+    <section class="surahs">
+      <div class="section-head">
+        <h2>Surahs</h2>
+        <input id="surah-filter" class="filter" type="search" placeholder="Filter by name or number" aria-label="Filter surahs">
+      </div>
+      <p id="surahs-error" class="error" hidden></p>
+      <ol id="surah-list" class="surah-grid"></ol>
+    </section>
+  </main>
+
+  <!-- Reader -->
+  <main id="reader-view" hidden>
+    <a class="back-link text-btn" href="quran.html">All surahs</a>
+
+    <section class="surah-head">
+      <p id="surah-arabic" class="arabic-title" lang="ar" dir="rtl"></p>
+      <h1 id="surah-title"></h1>
+      <p id="surah-meta" class="muted"></p>
+    </section>
+
+    <div class="reader-tools card">
+      <label>Translation
+        <select id="translation">
+          <option value="both">English + Urdu</option>
+          <option value="en">English</option>
+          <option value="ur">Urdu</option>
+          <option value="none">Arabic only</option>
+        </select>
+      </label>
+      <label>Reciter
+        <select id="reciter"></select>
+      </label>
+      <div class="font-size" role="group" aria-label="Arabic text size">
+        <button id="font-down" class="icon-btn small-btn" type="button" aria-label="Smaller text">A−</button>
+        <button id="font-up" class="icon-btn small-btn" type="button" aria-label="Larger text">A+</button>
+      </div>
+      <button id="play-surah" class="chip" type="button" disabled>Play surah</button>
+    </div>
+
+    <p id="reader-error" class="error" hidden></p>
+    <p id="basmala" class="basmala quran-text" lang="ar" dir="rtl" hidden></p>
+    <div id="ayahs" class="ayahs"><p class="muted loading-text">Loading…</p></div>
+
+    <nav class="surah-nav">
+      <a id="prev-surah" class="outline-btn" href="#" hidden></a>
+      <a id="next-surah" class="outline-btn" href="#" hidden></a>
+    </nav>
+  </main>
+
+  <div id="player" class="player" hidden>
+    <button id="player-prev" class="icon-btn" type="button" aria-label="Previous verse">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 9 12l9 6zM6 6v12" /></svg>
+    </button>
+    <button id="player-toggle" class="icon-btn play-btn" type="button" aria-label="Pause">
+      <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
+      <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z" /></svg>
+    </button>
+    <button id="player-next" class="icon-btn" type="button" aria-label="Next verse">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l9 6-9 6zM18 6v12" /></svg>
+    </button>
+    <div class="player-info">
+      <strong id="player-title"></strong>
+      <span id="player-reciter" class="muted small"></span>
+    </div>
+    <button id="player-close" class="icon-btn" type="button" aria-label="Stop and close player">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+    </button>
+  </div>
+
+  <footer>
+    <span>Quran text, translations and audio by <a href="https://alquran.cloud/api" target="_blank" rel="noopener">AlQuran.cloud</a></span>
+    <span>Translations: Saheeh International (English), Fateh Muhammad Jalandhry (Urdu)</span>
+  </footer>
+
+  <script src="common.js"></script>
+  <script src="quran.js"></script>
+</body>
+</html>
