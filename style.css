@@ -1,13 +1,13 @@
 :root {
-  --bg: #e6ede5;
-  --surface: #f6f9f4;
-  --ink: #12231c;
-  --muted: #5f7068;
-  --line: #cfdbd1;
-  --accent: #1d5b47;
-  --gold: #b8893a;
+  --bg: #f4f0e8;
+  --surface: #fbf9f4;
+  --ink: #1a1b26;
+  --muted: #6e6a62;
+  --line: #e2dccf;
+  --accent: #a8792c;
+  --gold: #a8792c;
   --error: #a2341f;
-  --shadow: 0 1px 2px rgba(18, 35, 28, 0.04), 0 12px 32px -12px rgba(18, 35, 28, 0.18);
+  --shadow: 0 1px 2px rgba(26, 27, 38, 0.04), 0 12px 32px -12px rgba(26, 27, 38, 0.18);
 
   --serif: "Instrument Serif", Georgia, serif;
   --sans: "Geist", system-ui, -apple-system, sans-serif;
@@ -19,11 +19,11 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0c241d;
-    --surface: #123128;
+    --bg: #0d1020;
+    --surface: #151a2e;
     --ink: #f1ede1;
-    --muted: #9db3a8;
-    --line: #21473b;
+    --muted: #a3a6b8;
+    --line: #262c45;
     --accent: #d9b36c;
     --gold: #d9b36c;
     --error: #f0a08c;
@@ -163,7 +163,7 @@ body.loading main { opacity: 0.45; }
 
 .hero[data-period="night"] {
   --sky: radial-gradient(ellipse at 80% -10%, rgba(130, 160, 210, 0.25), transparent 55%),
-         linear-gradient(170deg, #0a1730 0%, #112a45 55%, #164150 100%);
+         linear-gradient(170deg, #0a1430 0%, #13264a 55%, #1d3560 100%);
 }
 .hero[data-period="dawn"] {
   --sky: radial-gradient(ellipse at 50% 120%, rgba(255, 186, 150, 0.55), transparent 60%),
@@ -171,11 +171,11 @@ body.loading main { opacity: 0.45; }
 }
 .hero[data-period="morning"] {
   --sky: radial-gradient(ellipse at 20% 0%, rgba(255, 236, 190, 0.35), transparent 50%),
-         linear-gradient(170deg, #144763 0%, #2a6e8c 55%, #4f93a6 100%);
+         linear-gradient(170deg, #173c6b 0%, #2c629a 55%, #5a8ec2 100%);
 }
 .hero[data-period="afternoon"] {
   --sky: radial-gradient(ellipse at 50% -20%, rgba(255, 240, 200, 0.4), transparent 55%),
-         linear-gradient(170deg, #135069 0%, #2c7b86 55%, #5a9c8f 100%);
+         linear-gradient(170deg, #1a4677 0%, #3270a8 55%, #6a9dcc 100%);
 }
 .hero[data-period="evening"] {
   --sky: radial-gradient(ellipse at 85% 30%, rgba(255, 200, 120, 0.45), transparent 55%),
