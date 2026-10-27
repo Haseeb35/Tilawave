@@ -1,6 +1,6 @@
 // Service worker: makes the site installable and keeps it working offline.
 // Bump CACHE when the app shell changes so old files are cleared.
-const CACHE = "salah-v1";
+const CACHE = "tilawave-v2";
 
 const SHELL = [
   "./",
@@ -16,6 +16,7 @@ const SHELL = [
   "calendar.js",
   "manifest.webmanifest",
   "icons/icon.svg",
+  "icons/logo-mark.svg",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/maskable-512.png",

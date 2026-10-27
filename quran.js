@@ -296,6 +296,14 @@ function renderSurahList(surahs, filter = "") {
         </a>
       </li>`).join("")
     : `<li class="muted">No surah matches “${escapeHtml(filter)}”.</li>`;
+  decorateGrid($("surah-list"));
+}
+
+// 3D entrance by column, and tilt on hover, for surah and para cards
+function decorateGrid(list) {
+  const columns = Math.max(1, getComputedStyle(list).gridTemplateColumns.split(" ").length);
+  reveal(list.querySelectorAll(":scope > li"), (el, i) => i % columns);
+  tilt(list.querySelectorAll(".surah-card"), 5);
 }
 
 function renderParaList() {
@@ -316,6 +324,7 @@ function renderParaList() {
       </a>
     </li>`;
   }).join("");
+  decorateGrid($("para-list"));
 }
 
 // ---------- Search ----------
@@ -464,11 +473,11 @@ function setPrevNext(prev, next) {
 }
 
 function renderSurahHead(meta, surahs) {
-  document.title = `${meta.englishName} — Quran — Salah`;
+  document.title = `${meta.englishName} — Quran — Tilawave`;
   $("surah-arabic").textContent = meta.name;
-  $("surah-title").textContent = `${meta.number}. ${meta.englishName}`;
+  $("surah-title").textContent = meta.englishName;
   $("surah-meta").textContent =
-    `${meta.englishNameTranslation} · ${meta.revelationType === "Meccan" ? "Makki" : "Madani"} · ${meta.numberOfAyahs} verses`;
+    `Surah ${meta.number} · ${meta.englishNameTranslation} · ${meta.revelationType === "Meccan" ? "Makki" : "Madani"} · ${meta.numberOfAyahs} verses`;
   const prev = surahs[meta.number - 2];
   const next = surahs[meta.number];
   setPrevNext(
@@ -480,7 +489,7 @@ function renderSurahHead(meta, surahs) {
 function renderJuzHead(n) {
   const first = reader.items[0];
   const last = reader.items.at(-1);
-  document.title = `Para ${n} — Quran — Salah`;
+  document.title = `Para ${n} — Quran — Tilawave`;
   $("back-link").href = "quran.html?tab=paras";
   $("back-link").textContent = "All paras";
   $("surah-arabic").textContent = `الجزء ${arabicNumber(n)}`;

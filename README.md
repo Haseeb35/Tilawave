@@ -1,4 +1,4 @@
-# Salah — Prayer Times, Quran & Qibla
+# Tilawave — Quran, Prayer Times & Qibla
 
 A calm, mobile-friendly Islamic companion site: prayer times for any city, the Qibla direction, the Holy Quran with translations and recitation, a tasbih counter and an Islamic calendar.
 

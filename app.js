@@ -416,6 +416,7 @@ function startCountdown() {
     if (key !== lastNext) {
       lastNext = key;
       $("next-name").textContent = next.name;
+      replay($("next-name"), "flip-in");
       $("next-time").textContent = `at ${to12h(next.time).join(" ")}${next.tomorrow ? " tomorrow" : ""}`;
       renderTimes();
       renderTracker();
@@ -697,20 +698,44 @@ function drawDial() {
   $("ticks").innerHTML = parts.join("");
 }
 
+// Point the needle (and the arc from North) at an angle
+function setNeedle(angle) {
+  $("needle").setAttribute("transform", `rotate(${angle})`);
+  // Keep the Kaaba upright relative to the dial.
+  $("kaaba").setAttribute("transform", `translate(0 -57) rotate(${-angle})`);
+  const a = (angle * Math.PI) / 180;
+  const x = (68 * Math.sin(a)).toFixed(2);
+  const y = (-68 * Math.cos(a)).toFixed(2);
+  $("qibla-arc").setAttribute("d", angle < 0.5 ? "" : `M0 -68 A68 68 0 ${angle > 180 ? 1 : 0} 1 ${x} ${y}`);
+}
+
+// When the bearing changes, the needle swings to it like a real compass settling.
+let needleAt = 0;
+let needleFrame = 0;
+function swingNeedle(to) {
+  cancelAnimationFrame(needleFrame);
+  if (reduceMotion) return setNeedle((needleAt = to));
+  const from = needleAt;
+  const start = performance.now();
+  const duration = 1400;
+  // Ease out with a small overshoot that settles
+  const ease = (t) => 1 - Math.pow(1 - t, 3) * Math.cos(t * Math.PI * 2.2) * (1 - t * 0.2);
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / duration);
+    setNeedle(from + (to - from) * ease(t));
+    if (t < 1) needleFrame = requestAnimationFrame(step);
+  };
+  needleAt = to;
+  needleFrame = requestAnimationFrame(step);
+}
+
 function renderQibla(heading = 0) {
   if (state.qibla == null) return;
   const q = state.qibla;
   $("qibla-deg").textContent = `${q.toFixed(1)}°`;
   // Rotate the dial opposite to the phone's heading so N stays pointing north.
   $("dial").setAttribute("transform", `rotate(${-heading})`);
-  $("needle").setAttribute("transform", `rotate(${q})`);
-  // Keep the Kaaba upright relative to the dial.
-  $("kaaba").setAttribute("transform", `translate(0 -57) rotate(${-q})`);
-  // Arc along the face from North to the Qibla bearing
-  const a = (q * Math.PI) / 180;
-  const x = (68 * Math.sin(a)).toFixed(2);
-  const y = (-68 * Math.cos(a)).toFixed(2);
-  $("qibla-arc").setAttribute("d", `M0 -68 A68 68 0 ${q > 180 ? 1 : 0} 1 ${x} ${y}`);
+  if (needleAt !== q) swingNeedle(q);
 }
 
 const compass = { on: false, event: null, gotReading: false, timer: null };

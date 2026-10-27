@@ -244,6 +244,89 @@ for (const link of document.querySelectorAll(".nav a")) {
   if (link.dataset.page === document.body.dataset.page) link.setAttribute("aria-current", "page");
 }
 
+// ---------- Motion ----------
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+// The header gains a hairline once the page scrolls under it
+const topbar = document.querySelector(".topbar");
+const markScrolled = () => topbar.classList.toggle("scrolled", scrollY > 8);
+addEventListener("scroll", markScrolled, { passive: true });
+markScrolled();
+
+// Sections rise into place in 3D as they scroll into view
+const revealObserver = "IntersectionObserver" in window && !reduceMotion
+  ? new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      entry.target.classList.add("is-visible");
+      revealObserver.unobserve(entry.target);
+    }
+  }, { rootMargin: "0px 0px -6% 0px", threshold: 0.06 })
+  : null;
+
+// Safety net: a fast fling can skip past elements between observer callbacks,
+// so anything already above the bottom of the screen is shown on scroll.
+let revealFrame = 0;
+addEventListener("scroll", () => {
+  if (!revealObserver || revealFrame) return;
+  revealFrame = requestAnimationFrame(() => {
+    revealFrame = 0;
+    for (const el of document.querySelectorAll(".reveal:not(.is-visible)")) {
+      if (el.offsetParent !== null && el.getBoundingClientRect().top < innerHeight) {
+        el.classList.add("is-visible");
+        revealObserver.unobserve(el);
+      }
+    }
+  });
+}, { passive: true });
+
+// delay(el, i) returns a small step count used to stagger elements
+function reveal(elements, delay = (el, i) => Math.min(i, 6)) {
+  if (!revealObserver) return;
+  [...elements].forEach((el, i) => {
+    if (el.classList.contains("reveal")) return;
+    el.classList.add("reveal");
+    el.style.setProperty("--i", delay(el, i));
+    revealObserver.observe(el);
+  });
+}
+
+// Cards lean toward the pointer, like a physical object under the hand.
+// data-tilt sets the maximum angle in degrees.
+function tilt(elements, maxDefault = 4) {
+  if (!finePointer || reduceMotion) return;
+  for (const el of elements) {
+    if (el.classList.contains("tilt")) continue;
+    const max = Number(el.dataset.tilt) || maxDefault;
+    el.classList.add("tilt");
+    el.addEventListener("pointermove", (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      el.classList.add("tilting");
+      el.style.setProperty("--rx", `${(-y * max).toFixed(2)}deg`);
+      el.style.setProperty("--ry", `${(x * max).toFixed(2)}deg`);
+    });
+    el.addEventListener("pointerleave", () => {
+      el.classList.remove("tilting");
+      el.style.setProperty("--rx", "0deg");
+      el.style.setProperty("--ry", "0deg");
+    });
+  }
+}
+
+// Restart a CSS animation class on an element
+function replay(el, className) {
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+}
+
+reveal(document.querySelectorAll("main > section, main > .card, main > .place-bar, main > .continue"));
+tilt(document.querySelectorAll("[data-tilt]"));
+
 // ---------- Installable app & offline ----------
 
 if ("serviceWorker" in navigator) {
@@ -267,7 +350,7 @@ window.addEventListener("beforeinstallprompt", (e) => {
 window.addEventListener("appinstalled", () => {
   installPrompt = null;
   $("install-btn").hidden = true;
-  toast("Salah is installed. Open it from your home screen or app list.");
+  toast("Tilawave is installed. Open it from your home screen or app list.");
 });
 
 if (isIOS && !isStandalone) $("install-btn").hidden = false;

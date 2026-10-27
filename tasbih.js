@@ -117,11 +117,11 @@ function count() {
     }
   }
   navigator.vibrate?.(milestone ? [60, 60, 120] : 12);
-  $("counter").classList.remove("pulse");
-  void $("counter").offsetWidth; // restart the animation
-  $("counter").classList.add("pulse");
+  replay($("counter"), "pulse");
+  setTimeout(() => $("counter").classList.remove("pulse"), 180);
   save();
   render();
+  replay($("count"), "flip");
 }
 
 function undo() {
