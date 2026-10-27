@@ -66,7 +66,7 @@
     </div>
 
     <section id="hero" class="hero" data-period="night" data-tilt="2">
-      <div class="orb" aria-hidden="true"><span></span><span></span><i></i></div>
+      <div class="stars" aria-hidden="true"></div>
       <div class="hero-top">
         <div class="hero-meta">
           <p id="location" class="eyebrow">Loading</p>
@@ -82,7 +82,11 @@
           </p>
         </div>
       </div>
-      <svg id="arc" class="arc" viewBox="0 0 1000 210" aria-hidden="true"></svg>
+      <svg id="arc" class="arc" viewBox="0 0 1000 260" aria-hidden="true"></svg>
+      <div class="sky-status" aria-live="polite">
+        <span class="phase-chip"><span class="live-dot" aria-hidden="true"></span><span id="sky-phase">Loading</span></span>
+        <span id="sky-detail" class="sky-detail"></span>
+      </div>
     </section>
 
     <div id="prayer-banner" class="banner" role="alert" hidden>

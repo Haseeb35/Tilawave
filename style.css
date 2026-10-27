@@ -551,37 +551,6 @@ body.has-player .toast { bottom: 104px; }
          linear-gradient(170deg, #17183a 0%, #42294f 55%, #7d3f4e 100%);
 }
 
-/* A slowly turning 3D eight-pointed star (Rub el Hizb) behind the hero text */
-.orb {
-  position: absolute !important;
-  top: -70px;
-  right: -60px;
-  z-index: -1;
-  width: 320px;
-  height: 320px;
-  perspective: 900px;
-  pointer-events: none;
-}
-.orb span, .orb i {
-  position: absolute;
-  inset: 18%;
-  border: 1px solid rgba(255, 246, 225, 0.16);
-  border-radius: 6px;
-  transform: rotateX(58deg);
-  transform-style: preserve-3d;
-  animation: orb-spin 48s linear infinite;
-}
-.orb span:nth-child(2) { transform: rotateX(58deg) rotateZ(45deg); animation-name: orb-spin-45; }
-.orb i { inset: 36%; border-radius: 50%; border-color: rgba(255, 220, 160, 0.22); animation-duration: 32s; }
-@keyframes orb-spin {
-  from { transform: rotateX(58deg) rotateZ(0deg); }
-  to { transform: rotateX(58deg) rotateZ(360deg); }
-}
-@keyframes orb-spin-45 {
-  from { transform: rotateX(58deg) rotateZ(45deg); }
-  to { transform: rotateX(58deg) rotateZ(405deg); }
-}
-
 .hero-top { display: grid; grid-template-columns: 1fr 1.4fr; gap: 48px; align-items: end; }
 
 .dates { margin: 10px 0 0; font-size: 17px; }
@@ -614,19 +583,105 @@ body.has-player .toast { bottom: 104px; }
   to { opacity: 1; transform: none; }
 }
 
-/* Sun path */
-.arc { display: block; width: 100%; height: auto; margin-top: 32px; overflow: visible; }
-.arc .horizon { stroke: rgba(251, 246, 234, 0.22); stroke-width: 1; }
-.arc .arc-track { fill: none; stroke: rgba(251, 246, 234, 0.32); stroke-width: 1.5; stroke-dasharray: 2 6; stroke-linecap: round; }
-.arc .arc-done { fill: none; stroke: rgba(251, 246, 234, 0.9); stroke-width: 2; stroke-linecap: round; }
-.arc .marker circle { fill: #fbf6ea; stroke: none; }
-.arc .marker.passed circle { fill: rgba(251, 246, 234, 0.6); }
-.arc .marker.next circle { fill: #f2cd85; stroke: rgba(242, 205, 133, 0.35); stroke-width: 8; }
-.arc .marker text { font-family: var(--sans); font-size: 13px; fill: rgba(251, 246, 234, 0.75); text-anchor: middle; }
+/* ---------- Sky path ---------- */
+
+.arc { display: block; width: 100%; height: auto; margin-top: 24px; overflow: visible; }
+.arc .horizon { opacity: 0.4; }
+.arc .horizon-label { fill: rgba(251, 246, 234, 0.4); font-family: var(--sans); font-size: 11px; letter-spacing: 0.1em; text-anchor: end; text-transform: uppercase; }
+.arc .arc-track { fill: none; stroke: rgba(251, 246, 234, 0.3); stroke-width: 1.5; stroke-dasharray: 2 6; stroke-linecap: round; }
+.arc .arc-done { fill: none; stroke: rgba(251, 246, 234, 0.92); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(255, 230, 180, 0.35)); }
+
+/* Warm light on the horizon at dawn and dusk */
+.arc .horizon-glow { opacity: 0; transition: opacity 2s; }
+.hero[data-period="dawn"] .arc .horizon-glow,
+.hero[data-period="dusk"] .arc .horizon-glow { opacity: 1; }
+.hero[data-period="morning"] .arc .horizon-glow,
+.hero[data-period="evening"] .arc .horizon-glow { opacity: 0.35; }
+
+.arc .marker circle { fill: #fbf6ea; }
+.arc .marker.minor circle { fill: none; stroke: rgba(251, 246, 234, 0.75); stroke-width: 1.5; }
+.arc .marker.passed circle { fill: rgba(251, 246, 234, 0.55); }
+.arc .marker.passed.minor circle { fill: none; }
+.arc .marker.next circle { fill: #f2cd85; }
+.arc .marker text { fill: rgba(251, 246, 234, 0.82); font-family: var(--sans); font-size: 14px; text-anchor: middle; }
+.arc .marker .marker-time { fill: rgba(251, 246, 234, 0.5); font-family: var(--mono); font-size: 12px; }
 .arc .marker.next text { fill: #f2cd85; font-weight: 600; }
-.arc .sun-core { fill: #fff3d1; }
-#sun { transition: opacity 0.6s; }
-#sun.resting { opacity: 0.3; }
+.arc .marker.next .marker-time { fill: rgba(242, 205, 133, 0.8); font-weight: 400; }
+.arc .marker .ping {
+  fill: none;
+  stroke: #f2cd85;
+  stroke-width: 1.5;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ping 2.4s var(--ease) infinite;
+}
+@keyframes ping {
+  from { opacity: 0.9; transform: scale(1); }
+  to { opacity: 0; transform: scale(4.2); }
+}
+
+/* The sun: soft halo, slowly turning rays; dimmer while below the horizon */
+.indicator { transition: opacity 0.6s; }
+.sun-halo { animation: breathe 4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes breathe { 50% { transform: scale(1.15); opacity: 0.8; } }
+.sun-core { fill: #fff3d1; }
+.sun-rays { stroke: #ffe6ad; stroke-width: 2; stroke-linecap: round; animation: spin 18s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.indicator.is-sun.below .sun-core { fill: #ffcf9e; }
+.indicator.is-sun.below .sun-rays { opacity: 0.35; }
+.moon-core { fill: #f4ead2; filter: drop-shadow(0 0 6px rgba(223, 230, 255, 0.6)); }
+
+.now-tag rect { fill: rgba(10, 14, 30, 0.45); stroke: rgba(251, 246, 234, 0.22); }
+.now-tag text { fill: #fbf6ea; font-family: var(--mono); font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
+
+/* Live status under the sky path */
+.sky-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; padding-bottom: 8px; }
+.phase-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.live-dot { position: relative; width: 7px; height: 7px; border-radius: 50%; background: #8fe3b0; }
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #8fe3b0;
+  animation: live 2s ease-out infinite;
+}
+@keyframes live { to { transform: scale(3); opacity: 0; } }
+.sky-detail { color: var(--muted); font-size: 14px; }
+
+/* Night sky: twinkling stars and the odd shooting star */
+.stars { position: absolute !important; inset: 0; z-index: -1; opacity: 0; transition: opacity 2.5s; pointer-events: none; }
+.hero[data-period="night"] .stars { opacity: 1; }
+.hero[data-period="dawn"] .stars,
+.hero[data-period="dusk"] .stars { opacity: 0.35; }
+.stars i { position: absolute; border-radius: 50%; background: #fff; animation: twinkle 4s ease-in-out infinite; }
+@keyframes twinkle { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.15; } }
+.shooting-star {
+  position: absolute;
+  top: 12%;
+  left: 18%;
+  width: 120px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), transparent);
+  opacity: 0;
+  transform: rotate(-18deg);
+  animation: shoot 11s ease-in 3s infinite;
+}
+@keyframes shoot {
+  0%, 92% { opacity: 0; transform: translate(0, 0) rotate(-18deg); }
+  93% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-260px, 85px) rotate(-18deg); }
+}
 
 .schedule { margin-top: 64px; }
 
@@ -1155,7 +1210,7 @@ body.has-player main { padding-bottom: 96px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .reveal { opacity: 1; transform: none; translate: none; }
-  .orb { display: none; }
+  .shooting-star { display: none; }
   .tilt { transform: none !important; }
 }
 
@@ -1184,11 +1239,11 @@ body.has-player main { padding-bottom: 96px; }
   .pill-select { padding-right: 26px; padding-left: 8px; }
 
   .hero { padding: 32px 24px 16px; border-radius: 22px; }
-  .orb { width: 220px; height: 220px; top: -50px; right: -70px; }
   .hero-top { grid-template-columns: 1fr; gap: 28px; }
   .hero-next { text-align: left; }
   .arc { margin-top: 20px; }
-  .arc .marker text { display: none; }
+  .arc .marker text, .arc .horizon-label, .now-tag { display: none; }
+  .sky-detail { font-size: 13px; }
 
   h2 { font-size: 28px; }
   .schedule { margin-top: 40px; }

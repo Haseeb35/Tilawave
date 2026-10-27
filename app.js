@@ -337,65 +337,222 @@ function currentPeriod() {
   return "dusk";
 }
 
-// ---------- Sun path (Fajr → Isha arc) ----------
+// ---------- Sky path: the sun by day, the moon by night ----------
 
-const ARC = { x0: 40, x1: 960, base: 170, height: 140 };
+// Geometry of the SVG (viewBox 0 0 1000 260)
+const SKY = { x0: 40, x1: 960, horizon: 150, height: 118, padding: 25 * 60 };
+const DAY = 86400;
 
-function arcPoint(t) {
-  return [ARC.x0 + (ARC.x1 - ARC.x0) * t, ARC.base - ARC.height * Math.sin(Math.PI * t)];
+const fmt = (seconds) => to12h(new Date(((seconds % DAY) + DAY) % DAY * 1000).toISOString().slice(11, 16)).join(" ");
+
+function formatSpan(seconds) {
+  const m = Math.max(0, Math.round(seconds / 60));
+  const h = Math.floor(m / 60);
+  return h ? `${h}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
 }
 
-function arcPath(t0, t1) {
-  const steps = Math.max(2, Math.ceil((t1 - t0) * 80));
+// Everything is measured in seconds on one continuous axis, so a night that
+// crosses midnight (Isha → Fajr) is just a range with values past 86400.
+function skyModel() {
+  const at = (name) => toSeconds(state.today.timings[name]);
+  let now = nowSeconds();
+  const period = currentPeriod();
+
+  if (period !== "night") {
+    const sunrise = at("Sunrise");
+    const sunset = at("Maghrib");
+    // Sun altitude as a sine over the day: 0 at sunrise and sunset, 1 at noon,
+    // negative (below the horizon) for the dawn and dusk twilight.
+    const altitude = (t) => Math.max(-0.5, Math.sin((Math.PI * (t - sunrise)) / (sunset - sunrise)));
+    return {
+      mode: "day",
+      period,
+      now,
+      start: at("Fajr") - SKY.padding,
+      end: at("Isha") + SKY.padding,
+      altitude,
+      markers: PRAYERS.map((name) => ({ name, label: name, time: at(name), prayer: name !== "Sunrise" })),
+      sunrise,
+      sunset,
+    };
+  }
+
+  // Night: from tonight's Isha to the next Fajr. Before Fajr (after midnight),
+  // the night started yesterday; today's Isha is within a minute of it.
+  const afterMidnight = now < at("Fajr");
+  if (afterMidnight) now += DAY;
+  const isha = at("Isha");
+  const fajr = (afterMidnight ? at("Fajr") : toSeconds(state.tomorrow.timings.Fajr)) + DAY;
+  const late = (name) => { const t = at(name); return t < 12 * 3600 ? t + DAY : t; };
+  const midnight = late("Midnight");
+  const lastThird = late("Lastthird");
+  const altitude = (t) => 0.62 * Math.max(-0.5, Math.sin((Math.PI * (t - isha)) / (fajr - isha)));
+  return {
+    mode: "night",
+    period,
+    now,
+    start: isha - SKY.padding,
+    end: fajr + SKY.padding,
+    altitude,
+    markers: [
+      { name: "Isha", label: "Isha", time: isha, prayer: true },
+      { name: "Midnight", label: "Midnight", time: midnight },
+      { name: "Lastthird", label: "Last third", time: lastThird },
+      { name: "Fajr", label: "Fajr", time: fajr, prayer: true },
+    ],
+    midnight,
+    lastThird,
+    fajr,
+  };
+}
+
+const skyX = (m, t) => SKY.x0 + ((SKY.x1 - SKY.x0) * (t - m.start)) / (m.end - m.start);
+const skyY = (m, t) => SKY.horizon - SKY.height * m.altitude(t);
+
+function skyPath(m, from, to) {
+  if (to <= from) return "";
+  const steps = Math.max(2, Math.ceil(((to - from) / (m.end - m.start)) * 120));
   let d = "";
   for (let i = 0; i <= steps; i++) {
-    const [x, y] = arcPoint(t0 + ((t1 - t0) * i) / steps);
-    d += `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    const t = from + ((to - from) * i) / steps;
+    d += `${i ? "L" : "M"}${skyX(m, t).toFixed(1)} ${skyY(m, t).toFixed(1)}`;
   }
   return d;
 }
 
-// Position of a time of day along the arc, 0 (Fajr) to 1 (Isha)
-function arcT(seconds) {
-  const start = toSeconds(state.today.timings.Fajr);
-  const end = toSeconds(state.today.timings.Isha);
-  return Math.min(1, Math.max(0, (seconds - start) / (end - start)));
+// What's happening right now, in words
+function skyStatus(m) {
+  const at = (name) => toSeconds(state.today.timings[name]);
+  const now = m.now;
+  if (m.mode === "night") {
+    if (now >= m.lastThird) return ["Last third of the night", `Best time for Tahajjud · Fajr in ${formatSpan(m.fajr - now)}`];
+    if (now >= m.midnight) return ["Night", `Last third begins at ${fmt(m.lastThird)}`];
+    return ["Isha time", `Night midpoint ${fmt(m.midnight)} · Last third from ${fmt(m.lastThird)}`];
+  }
+  switch (m.period) {
+    case "dawn": return ["Fajr time · Dawn", `Sunrise in ${formatSpan(m.sunrise - now)}. Pray Fajr before it`];
+    case "morning": return ["Morning", `Sun is up · ${formatSpan(m.sunset - now)} of daylight left`];
+    case "afternoon": return ["Dhuhr time", `${formatSpan(m.sunset - now)} of daylight left`];
+    case "evening": return ["Asr time", `Sunset in ${formatSpan(m.sunset - now)}`];
+    default: return ["Maghrib time · Dusk", `Twilight fades by Isha at ${fmt(at("Isha"))}`];
+  }
 }
 
+// A few dozen stars for the night sky, placed once
+function drawStars() {
+  const field = document.querySelector("#hero .stars");
+  if (!field || field.childElementCount) return;
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  field.innerHTML = Array.from({ length: 46 }, () => {
+    const size = rand() < 0.15 ? 2.5 : 1.5;
+    return `<i style="left:${(rand() * 100).toFixed(1)}%;top:${(rand() * 62).toFixed(1)}%;width:${size}px;height:${size}px;` +
+      `animation-delay:${(rand() * 6).toFixed(2)}s;animation-duration:${(3 + rand() * 4).toFixed(2)}s"></i>`;
+  }).join("") + `<b class="shooting-star"></b>`;
+}
+
+let sky = null;           // the current model
+let skyIntro = null;      // { from, startedAt } while the indicator glides in
+let skyFrame = 0;
+
 function renderArc() {
-  const now = nowSeconds();
+  const m = skyModel();
+  sky = m;
   const next = nextPrayer();
-  const markers = PRAYERS.map((name) => {
-    const s = toSeconds(state.today.timings[name]);
-    const [x, y] = arcPoint(arcT(s));
-    const cls = !next.tomorrow && name === next.name ? "next" : s <= now ? "passed" : "";
+  const nightNext = m.mode === "night" ? "Fajr" : null;
+
+  const markers = m.markers.map((mk) => {
+    const x = skyX(m, mk.time).toFixed(1);
+    const y = skyY(m, mk.time).toFixed(1);
+    const isNext = mk.prayer && (nightNext ? mk.name === nightNext : !next.tomorrow && mk.name === next.name);
+    const cls = [isNext ? "next" : mk.time <= m.now ? "passed" : "", mk.prayer ? "" : "minor"].join(" ");
     return `<g class="marker ${cls}">
-      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" />
-      <text x="${x.toFixed(1)}" y="${ARC.base + 30}">${name}</text>
+      ${isNext ? `<circle class="ping" cx="${x}" cy="${y}" r="5" />` : ""}
+      <circle cx="${x}" cy="${y}" r="${mk.prayer ? 5 : 3.5}" />
+      <text x="${x}" y="${SKY.horizon + 80}">${mk.label}</text>
+      <text class="marker-time" x="${x}" y="${SKY.horizon + 98}">${fmt(mk.time)}</text>
     </g>`;
   }).join("");
+
+  const glowX = m.mode === "day" ? skyX(m, m.period === "dusk" || m.period === "evening" ? m.sunset : m.sunrise) : 500;
   $("arc").innerHTML = `
     <defs>
       <radialGradient id="sun-glow">
-        <stop offset="0" stop-color="#ffe6ad" stop-opacity="0.9" />
+        <stop offset="0" stop-color="#ffe6ad" stop-opacity="0.85" />
         <stop offset="1" stop-color="#ffe6ad" stop-opacity="0" />
       </radialGradient>
+      <radialGradient id="moon-glow">
+        <stop offset="0" stop-color="#dfe6ff" stop-opacity="0.45" />
+        <stop offset="1" stop-color="#dfe6ff" stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id="horizon-glow">
+        <stop offset="0" stop-color="#ffb489" stop-opacity="0.5" />
+        <stop offset="0.45" stop-color="#ffb489" stop-opacity="0.18" />
+        <stop offset="1" stop-color="#ffb489" stop-opacity="0" />
+      </radialGradient>
+      <linearGradient id="horizon-fade" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#fff" stop-opacity="0" />
+        <stop offset="0.12" stop-color="#fff" stop-opacity="1" />
+        <stop offset="0.88" stop-color="#fff" stop-opacity="1" />
+        <stop offset="1" stop-color="#fff" stop-opacity="0" />
+      </linearGradient>
+      <mask id="crescent"><rect x="-20" y="-20" width="40" height="40" fill="#fff" /><circle cx="5" cy="-4" r="9" fill="#000" /></mask>
     </defs>
-    <line class="horizon" x1="0" x2="1000" y1="${ARC.base}" y2="${ARC.base}" />
-    <path class="arc-track" d="${arcPath(0, 1)}" />
+    <ellipse class="horizon-glow ${m.mode}" cx="${glowX.toFixed(1)}" cy="${SKY.horizon}" rx="260" ry="95" fill="url(#horizon-glow)" />
+    <rect class="horizon" x="0" y="${SKY.horizon - 0.5}" width="1000" height="1" fill="url(#horizon-fade)" />
+    <text class="horizon-label" x="996" y="${SKY.horizon - 6}">Horizon</text>
+    <path class="arc-track" d="${skyPath(m, m.start, m.end)}" />
     <path id="arc-done" class="arc-done" />
     ${markers}
-    <g id="sun"><circle r="28" fill="url(#sun-glow)" /><circle class="sun-core" r="8" /></g>`;
-  updateSun();
+    <g id="sun" class="indicator ${m.mode === "night" ? "is-moon" : "is-sun"}">
+      ${m.mode === "night"
+        ? `<circle r="30" fill="url(#moon-glow)" /><circle class="moon-core" r="9" mask="url(#crescent)" />`
+        : `<circle class="sun-halo" r="30" fill="url(#sun-glow)" />
+           <g class="sun-rays">${Array.from({ length: 8 }, (_, i) => `<line y1="-13" y2="-17.5" transform="rotate(${i * 45})" />`).join("")}</g>
+           <circle class="sun-core" r="8" />`}
+    </g>
+    <g id="now-tag" class="now-tag"><rect x="-38" y="-14" width="76" height="22" rx="11" /><text y="1.5"></text></g>`;
+
+  // Draw in: the travelled path and the sun/moon glide from the start to "now"
+  skyIntro = reduceMotion ? null : { startedAt: performance.now() };
+  cancelAnimationFrame(skyFrame);
+  const animate = () => {
+    updateSun();
+    if (skyIntro) skyFrame = requestAnimationFrame(animate);
+  };
+  animate();
 }
 
 function updateSun() {
-  const now = nowSeconds();
-  const t = arcT(now);
-  const [x, y] = arcPoint(t);
-  $("arc-done").setAttribute("d", t > 0 ? arcPath(0, t) : "");
+  if (!sky) return;
+  const fresh = skyModel();
+  if (fresh.mode !== sky.mode) return renderArc();
+  sky.now = fresh.now;
+  sky.period = fresh.period;
+  const m = sky;
+
+  let shown = Math.min(Math.max(m.now, m.start), m.end);
+  if (skyIntro) {
+    const p = Math.min(1, (performance.now() - skyIntro.startedAt) / 1600);
+    const eased = 1 - Math.pow(1 - p, 3);
+    shown = m.start + (shown - m.start) * eased;
+    if (p >= 1) skyIntro = null;
+  }
+
+  const x = skyX(m, shown);
+  const y = skyY(m, shown);
+  $("arc-done").setAttribute("d", skyPath(m, m.start, shown));
   $("sun").setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
-  $("sun").classList.toggle("resting", currentPeriod() === "night");
+  $("sun").classList.toggle("below", m.altitude(shown) < 0);
+
+  // "Now" tag rides above the sun/moon, kept inside the card
+  const tagX = Math.min(Math.max(x, 48), 952);
+  $("now-tag").setAttribute("transform", `translate(${tagX.toFixed(1)} ${(y - 40).toFixed(1)})`);
+  $("now-tag").querySelector("text").textContent = `Now ${fmt(m.now)}`;
+
+  const [phase, detail] = skyStatus(m);
+  $("sky-phase").textContent = phase;
+  $("sky-detail").textContent = detail;
 }
 
 function startCountdown() {
@@ -838,6 +995,7 @@ for (const id of ["method", "school"]) {
 
 (function init() {
   drawDial();
+  drawStars();
   renderAlertsButton();
   renderTracker();
   loadVerseOfTheDay();
