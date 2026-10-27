@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prayer Times & Qibla</title>
+  <meta name="description" content="Today's prayer times for your city and the Qibla direction.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🕌 Prayer Times & Qibla</h1>
+    <p id="dates" class="muted">Loading date…</p>
+  </header>
+
+  <main>
+    <!-- Location -->
+    <section class="card">
+      <form id="city-form" class="location-form">
+        <input id="city" type="text" placeholder="City (e.g. Lahore)" required>
+        <input id="country" type="text" placeholder="Country (e.g. Pakistan)" required>
+        <button type="submit">Search</button>
+      </form>
+      <button id="gps-btn" class="secondary">📍 Use my location</button>
+      <details class="settings">
+        <summary>Settings</summary>
+        <label>Calculation method
+          <select id="method">
+            <option value="1">University of Islamic Sciences, Karachi</option>
+            <option value="2">ISNA (North America)</option>
+            <option value="3">Muslim World League</option>
+            <option value="4">Umm Al-Qura, Makkah</option>
+            <option value="5">Egyptian General Authority</option>
+            <option value="8">Gulf Region</option>
+            <option value="16">Dubai</option>
+          </select>
+        </label>
+        <label>Asr school
+          <select id="school">
+            <option value="1">Hanafi</option>
+            <option value="0">Shafi'i / Maliki / Hanbali</option>
+          </select>
+        </label>
+      </details>
+      <p id="location" class="muted"></p>
+      <p id="error" class="error" hidden></p>
+    </section>
+
+    <!-- Next prayer -->
+    <section class="card highlight">
+      <p class="muted">Next prayer</p>
+      <h2 id="next-name">—</h2>
+      <p id="countdown" class="countdown">--:--:--</p>
+    </section>
+
+    <!-- Times -->
+    <section class="card">
+      <h3>Today's times</h3>
+      <ul id="times" class="times"></ul>
+    </section>
+
+    <!-- Qibla -->
+    <section class="card qibla">
+      <h3>Qibla direction</h3>
+      <div class="compass">
+        <span class="n">N</span>
+        <div id="needle" class="needle">🕋</div>
+      </div>
+      <p><strong id="qibla-deg">—</strong> from North</p>
+      <button id="compass-btn" class="secondary">🧭 Enable live compass</button>
+      <p id="compass-note" class="muted small">On a phone, turn on the compass and hold the device flat.</p>
+    </section>
+  </main>
+
+  <footer class="muted small">
+    Times from the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener">Aladhan API</a>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
