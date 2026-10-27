@@ -1,7 +1,3 @@
-const HIJRI_MONTHS = [
-  "Muharram", "Safar", "Rabi al-Awwal", "Rabi al-Thani", "Jumada al-Ula", "Jumada al-Thaniyah",
-  "Rajab", "Sha'ban", "Ramadan", "Shawwal", "Dhul Qa'dah", "Dhul Hijjah",
-];
 
 const EVENTS = [
   { month: 1, day: 1, name: "Islamic New Year" },
@@ -16,18 +12,12 @@ const EVENTS = [
   { month: 12, day: 10, name: "Eid al-Adha" },
 ];
 
-const hijriFormat = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", {
-  day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC",
-});
 const longDate = new Intl.DateTimeFormat("en-GB", {
   weekday: "short", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
 });
 
-function hijriOf(date) {
-  const parts = hijriFormat.formatToParts(date);
-  const get = (type) => Number(parts.find((p) => p.type === type).value);
-  return { day: get("day"), month: get("month"), year: get("year") };
-}
+// Hijri date of a UTC calendar day, following the Hijri adjustment in Settings
+const hijriOf = (date) => hijriFor(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
 
 // ---------- Islamic dates (calculated locally, no network needed) ----------
 
@@ -69,7 +59,7 @@ function renderEvents() {
     <li class="card${e.days === 0 ? " is-today" : ""}">
       <div>
         <strong>${e.name}</strong>
-        <span class="muted">${e.day} ${HIJRI_MONTHS[e.month - 1]} ${e.hijri.year} AH</span>
+        <span class="muted">${e.day} ${HIJRI_MONTH_NAMES[e.month - 1]} ${e.hijri.year} AH</span>
         ${e.note ? `<span class="muted small">${e.note}</span>` : ""}
       </div>
       <div class="event-when">
@@ -108,6 +98,7 @@ async function loadMonth() {
       school,
       timezonestring: view.place.timezone,
     });
+    if (tuneParam()) params.set("tune", tuneParam());
     const { data } = await getJSON(`${ALADHAN_API}/calendar/${view.year}/${view.month}?${params}`);
     if (id !== view.requestId) return;
     renderMonth(data);
@@ -121,6 +112,13 @@ async function loadMonth() {
   }
 }
 
+// "28-10-2026" -> "17 Jumada al-Ula"
+function hijriCell(ddmmyyyy) {
+  const [d, m, y] = ddmmyyyy.split("-").map(Number);
+  const h = hijriFor(y, m, d);
+  return `${h.day} ${HIJRI_MONTH_NAMES[h.month - 1]}`;
+}
+
 function renderMonth(days) {
   const todayKey = dateIn(view.place.timezone);
   $("timetable").innerHTML = days.map(({ date, timings }) => {
@@ -129,7 +127,7 @@ function renderMonth(days) {
     const cls = [isToday && "today", isFriday && "friday"].filter(Boolean).join(" ");
     return `<tr class="${cls}">
       <th scope="row">${date.gregorian.weekday.en.slice(0, 3)} ${Number(date.gregorian.day)}</th>
-      <td class="hijri">${Number(date.hijri.day)} ${HIJRI_MONTHS[date.hijri.month.number - 1]}</td>
+      <td class="hijri">${hijriCell(date.gregorian.date)}</td>
       ${PRAYER_COLUMNS.map((p) => `<td>${to12h(timings[p]).join(" ")}</td>`).join("")}
     </tr>`;
   }).join("");

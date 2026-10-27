@@ -4,7 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quran — Tilawave</title>
-  <meta name="description" content="Read, listen to and search the Holy Quran with English and Urdu translations.">
+  <meta name="description" content="Read, listen to, search and study the Holy Quran with translations, transliteration, tafsir and surah introductions.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Tilawave">
+  <meta property="og:title" content="Quran — Tilawave">
+  <meta property="og:description" content="Read, listen to, search and study the Holy Quran with translations, transliteration, tafsir and surah introductions.">
+  <meta property="og:image" content="icons/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -35,8 +43,11 @@
     <nav class="nav" aria-label="Main">
       <a href="./" data-page="home">Prayer times</a>
       <a href="quran.html" data-page="quran">Quran</a>
+      <a href="hadith.html" data-page="hadith">Hadith</a>
+      <a href="duas.html" data-page="duas">Duas</a>
       <a href="tasbih.html" data-page="tasbih">Tasbih</a>
       <a href="calendar.html" data-page="calendar">Calendar</a>
+      <a href="zakat.html" data-page="zakat">Zakat</a>
     </nav>
     <button id="install-btn" class="chip install-btn" type="button" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" /></svg>
@@ -63,9 +74,15 @@
         </select>
         <button class="pill-submit" type="submit">Search</button>
       </form>
+      <div id="recent-searches" class="recent-searches" hidden></div>
     </section>
 
     <a id="continue" class="continue card" hidden></a>
+
+    <section class="popular" aria-label="Popular surahs">
+      <p class="eyebrow">Popular</p>
+      <div id="popular-list" class="popular-list"></div>
+    </section>
 
     <section id="khatam" class="khatam card">
       <div class="khatam-head">
@@ -98,7 +115,22 @@
       </div>
     </section>
 
-    <section id="results" class="results" hidden>
+    <section id="hifz" class="hifz card">
+      <div class="khatam-head">
+        <div>
+          <p class="eyebrow">Hifz · memorisation</p>
+          <h2 id="hifz-title">0 of 114 surahs</h2>
+        </div>
+        <a id="hifz-next" class="outline-btn" href="#" hidden></a>
+      </div>
+      <div class="progress" role="progressbar" aria-label="Verses memorised" aria-valuemin="0" aria-valuemax="6236">
+        <div id="hifz-bar" class="progress-bar"></div>
+      </div>
+      <p id="hifz-status" class="muted small"></p>
+      <div id="hifz-list" class="hifz-list"></div>
+    </section>
+
+    <section id="results" class="results" data-reveal="flat" hidden>
       <div class="section-head">
         <h2>Search results</h2>
         <button id="results-clear" class="text-btn" type="button">Clear</button>
@@ -107,12 +139,12 @@
       <ol id="results-list" class="result-list"></ol>
     </section>
 
-    <section id="bookmarks" class="bookmarks" hidden>
+    <section id="bookmarks" class="bookmarks" data-reveal="flat" hidden>
       <div class="section-head"><h2>Bookmarks</h2></div>
       <ul id="bookmarks-list" class="bookmark-list"></ul>
     </section>
 
-    <section class="surahs">
+    <section class="surahs" data-reveal="flat">
       <div class="section-head">
         <div class="segmented" role="tablist" aria-label="Browse by">
           <button id="tab-surahs" role="tab" type="button" aria-selected="true">Surahs</button>
@@ -134,10 +166,29 @@
       <p id="surah-arabic" class="arabic-title" lang="ar" dir="rtl"></p>
       <h1 id="surah-title"></h1>
       <p id="surah-meta" class="muted"></p>
+      <button id="info-btn" class="chip info-btn" type="button" aria-expanded="false" aria-controls="surah-info" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></svg>
+        About this surah
+      </button>
+      <button id="hifz-btn" class="chip info-btn" type="button" aria-pressed="false" hidden>Mark as memorised</button>
+    </section>
+
+    <section id="surah-info" class="surah-info card" hidden>
+      <div class="surah-info-head">
+        <div>
+          <p class="eyebrow">Introduction</p>
+          <p id="info-source" class="muted small"></p>
+        </div>
+        <div class="segmented" role="tablist" aria-label="Introduction language">
+          <button id="info-en" role="tab" type="button" aria-selected="true">English</button>
+          <button id="info-ur" role="tab" type="button" aria-selected="false">اردو</button>
+        </div>
+      </div>
+      <div id="info-text" class="rich-text"></div>
     </section>
 
     <div class="reader-tools card">
-      <label>Translation
+      <label>Show
         <select id="translation">
           <option value="both">English + Urdu</option>
           <option value="en">English</option>
@@ -152,7 +203,27 @@
         <button id="font-down" class="icon-btn small-btn" type="button" aria-label="Smaller text">A−</button>
         <button id="font-up" class="icon-btn small-btn" type="button" aria-label="Larger text">A+</button>
       </div>
-      <button id="play-surah" class="chip" type="button" disabled>Play surah</button>
+      <button id="more-btn" class="chip" type="button" aria-expanded="false" aria-controls="reader-more">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
+        Translations
+      </button>
+      <button id="play-surah" class="chip play-chip" type="button" disabled>Play surah</button>
+      <div id="reader-more" class="reader-more" hidden>
+        <label>English translation
+          <select id="en-edition"></select>
+        </label>
+        <label>Urdu translation
+          <select id="ur-edition"></select>
+        </label>
+        <label>Arabic script
+          <select id="script">
+            <option value="uthmani">Uthmani (Madani mushaf)</option>
+            <option value="indopak">Indo-Pak</option>
+          </select>
+        </label>
+        <button id="translit-btn" class="chip" type="button" aria-pressed="false">Transliteration</button>
+        <p class="shortcut-hint muted small">Keyboard: <kbd>Space</kbd> play or pause · <kbd>←</kbd> <kbd>→</kbd> previous or next verse · <kbd>B</kbd> bookmark · <kbd>T</kbd> tafsir · <kbd>S</kbd> share</p>
+      </div>
     </div>
 
     <p id="reader-error" class="error" hidden></p>
@@ -170,6 +241,34 @@
     </nav>
   </main>
 
+  <dialog id="tafsir" class="drawer" aria-labelledby="tafsir-title">
+    <div class="drawer-head">
+      <div>
+        <p class="eyebrow">Tafsir</p>
+        <h2 id="tafsir-title"></h2>
+      </div>
+      <button id="tafsir-close" class="icon-btn" type="button" aria-label="Close tafsir">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
+    </div>
+    <div class="drawer-tools">
+      <select id="tafsir-source" aria-label="Tafsir"></select>
+      <div class="drawer-steps">
+        <button id="tafsir-prev" class="icon-btn small-btn" type="button" aria-label="Previous verse">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+        </button>
+        <button id="tafsir-next" class="icon-btn small-btn" type="button" aria-label="Next verse">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        </button>
+      </div>
+    </div>
+    <div id="tafsir-body" class="drawer-body">
+      <p id="tafsir-verse" class="quran-text" lang="ar" dir="rtl"></p>
+      <p id="tafsir-covers" class="tafsir-covers small" hidden></p>
+      <div id="tafsir-text" class="rich-text"></div>
+    </div>
+  </dialog>
+
   <div id="player" class="player" hidden>
     <button id="player-prev" class="icon-btn" type="button" aria-label="Previous verse">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 9 12l9 6zM6 6v12" /></svg>
@@ -185,6 +284,14 @@
       <strong id="player-title"></strong>
       <span id="player-reciter" class="muted small"></span>
     </div>
+    <button id="player-repeat" class="chip player-chip" type="button" aria-label="Repeat each verse" title="Repeat each verse">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" /></svg>
+      <span id="repeat-label">1×</span>
+    </button>
+    <button id="player-sleep" class="chip player-chip" type="button" aria-label="Sleep timer" title="Sleep timer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>
+      <span id="sleep-label">Off</span>
+    </button>
     <button id="player-close" class="icon-btn" type="button" aria-label="Stop and close player">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
     </button>
@@ -205,8 +312,12 @@
       <nav class="footer-nav" aria-label="Footer">
         <a href="./">Prayer times</a>
         <a href="quran.html">Quran</a>
+        <a href="hadith.html">Hadith</a>
+        <a href="duas.html">Duas</a>
         <a href="tasbih.html">Tasbih</a>
         <a href="calendar.html">Calendar</a>
+        <a href="zakat.html">Zakat</a>
+        <a href="settings.html">Settings</a>
       </nav>
     </div>
     <p class="footer-credits">
@@ -214,7 +325,8 @@
       <a href="https://alquran.cloud/api" target="_blank" rel="noopener">AlQuran.cloud</a>,
       <a href="https://github.com/fawazahmed0/hadith-api" target="_blank" rel="noopener">hadith-api</a> and
       <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>.
-      Translations: Saheeh International (English), Fateh Muhammad Jalandhry (Urdu).
+      Tafsir and surah introductions from <a href="https://quran.com" target="_blank" rel="noopener">Quran.com</a>.
+      Translations as named in the reader settings.
     </p>
   </footer>
 

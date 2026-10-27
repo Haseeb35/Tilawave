@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tilawave — Prayer Times, Quran & Qibla</title>
   <meta name="description" content="Today's prayer times for your city, the Qibla direction and a verse of the Quran every day.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Tilawave">
+  <meta property="og:title" content="Tilawave — Prayer Times, Quran & Qibla">
+  <meta property="og:description" content="Today's prayer times for your city, the Qibla direction and a verse of the Quran every day.">
+  <meta property="og:image" content="icons/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -36,8 +44,11 @@
     <nav class="nav" aria-label="Main">
       <a href="./" data-page="home">Prayer times</a>
       <a href="quran.html" data-page="quran">Quran</a>
+      <a href="hadith.html" data-page="hadith">Hadith</a>
+      <a href="duas.html" data-page="duas">Duas</a>
       <a href="tasbih.html" data-page="tasbih">Tasbih</a>
       <a href="calendar.html" data-page="calendar">Calendar</a>
+      <a href="zakat.html" data-page="zakat">Zakat</a>
     </nav>
     <button id="install-btn" class="chip install-btn" type="button" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" /></svg>
@@ -94,6 +105,8 @@
       <button id="prayer-banner-close" class="text-btn" type="button">Dismiss</button>
     </div>
 
+    <div id="today-notes" class="today-notes" aria-live="polite"></div>
+
     <p id="error" class="error" hidden></p>
 
     <section class="schedule">
@@ -124,12 +137,19 @@
         <div class="alerts">
           <button id="alerts-btn" class="chip" type="button" aria-pressed="false">Prayer alerts: Off</button>
           <button id="alerts-test" class="text-btn" type="button" hidden>Test alert</button>
+          <button id="share-times" class="chip" type="button" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></svg>
+            Share times
+          </button>
         </div>
-        <a class="text-btn" href="calendar.html">Monthly timetable</a>
+        <div class="schedule-links">
+          <a id="tune-link" class="text-btn" href="settings.html#prayer-settings">Adjust times</a>
+          <a class="text-btn" href="calendar.html">Monthly timetable</a>
+        </div>
       </div>
     </section>
 
-    <section id="tracker" class="tracker card">
+    <section id="tracker" class="tracker card" data-reveal="flat">
       <div class="tracker-head">
         <div>
           <p class="eyebrow">Prayer tracker</p>
@@ -150,7 +170,7 @@
       <p class="muted small">Tick a prayer in today's list once you've prayed it, or tap any square to fix a past day. Streak counts days with all five prayers.</p>
     </section>
 
-    <section id="verse" class="verse card">
+    <section id="verse" class="verse card" data-reveal="flat">
       <span class="verse-ornament" aria-hidden="true"></span>
       <div class="verse-head">
         <p class="eyebrow">Verse of the day</p>
@@ -162,11 +182,12 @@
       <div class="verse-actions">
         <button id="verse-play" class="outline-btn" type="button" disabled>Play recitation</button>
         <button id="verse-copy" class="text-btn" type="button" disabled>Copy</button>
+        <button id="verse-share" class="text-btn" type="button" disabled>Share as image</button>
         <a id="verse-link" class="text-btn" href="quran.html">Read in context</a>
       </div>
     </section>
 
-    <section id="hadith" class="verse hadith card">
+    <section id="hadith" class="verse hadith card" data-reveal="flat">
       <div class="verse-head">
         <p class="eyebrow">Hadith of the day</p>
         <span id="hadith-ref" class="verse-ref"></span>
@@ -180,10 +201,24 @@
       </details>
       <div class="verse-actions">
         <button id="hadith-copy" class="text-btn" type="button" disabled>Copy</button>
+        <button id="hadith-share" class="text-btn" type="button" disabled>Share as image</button>
+        <a id="hadith-link" class="text-btn" href="hadith.html">Read in the library</a>
       </div>
     </section>
 
-    <section class="qibla card">
+    <section id="qada" class="qada card" data-reveal="flat">
+      <div class="qada-head">
+        <div>
+          <p class="eyebrow">Qada · prayers to make up</p>
+          <h2 id="qada-total">0 prayers</h2>
+        </div>
+        <button id="qada-import" class="chip" type="button" hidden></button>
+      </div>
+      <ul id="qada-list" class="qada-list"></ul>
+      <p class="muted small">Use + to add a missed prayer and “Made up” each time you pray one. Unmarked prayers from your tracker can be added in one tap.</p>
+    </section>
+
+    <section id="qibla" class="qibla card" data-reveal="flat">
       <div class="qibla-text">
         <h2>Qibla</h2>
         <p class="bearing"><span id="qibla-deg">—</span></p>
@@ -211,7 +246,20 @@
         </g>
       </svg>
     </section>
+
+    <section id="mosques" class="mosques card" data-reveal="flat">
+      <div class="mosques-head">
+        <div>
+          <p class="eyebrow">Nearby</p>
+          <h2>Mosques near you</h2>
+          <p id="mosques-status" class="muted small">Find the closest mosques with walking distance and directions.</p>
+        </div>
+        <button id="mosques-btn" class="outline-btn" type="button">Find mosques</button>
+      </div>
+      <ol id="mosques-list" class="mosques-list"></ol>
+    </section>
   </main>
+
 
   <footer class="site-footer">
     <div class="footer-top">
@@ -228,8 +276,12 @@
       <nav class="footer-nav" aria-label="Footer">
         <a href="./">Prayer times</a>
         <a href="quran.html">Quran</a>
+        <a href="hadith.html">Hadith</a>
+        <a href="duas.html">Duas</a>
         <a href="tasbih.html">Tasbih</a>
         <a href="calendar.html">Calendar</a>
+        <a href="zakat.html">Zakat</a>
+        <a href="settings.html">Settings</a>
       </nav>
     </div>
     <p class="footer-credits">

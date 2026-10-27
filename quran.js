@@ -5,6 +5,9 @@ const JUZ_STARTS_KEY = "quran-juz-starts";
 const KHATAM_KEY = "quran-khatam";
 const READING_DAYS_KEY = "quran-reading-days";
 const MAX_RESULTS = 50;
+const SEARCHES_KEY = "quran-searches";
+const HIFZ_KEY = "quran-hifz"; // surah numbers memorised
+const POPULAR = [{ surah: 36 }, { surah: 18 }, { surah: 67 }, { surah: 55 }, { surah: 56 }, { surah: 2, ayah: 255, label: "Ayat al-Kursi" }];
 
 // Traditional para names (the opening words of each juz), as used in Pakistan and India
 const PARA_NAMES = [
@@ -22,6 +25,8 @@ const ICONS = {
   bookmark: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>`,
   copy: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg>`,
   link: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1" /></svg>`,
+  share: SHARE_ICON,
+  tafsir: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7.3 4.5 4 5v13c3.3-.5 6 0 8 1.5 2-1.5 4.7-2 8-1.5V5c-3.3-.5-6 0-8 1.5zM12 6.5v13" /></svg>`,
 };
 
 // ---------- Data ----------
@@ -190,11 +195,58 @@ $("khatam-new").addEventListener("click", () => {
   toast("New khatam started. May Allah make it easy.");
 });
 
+// ---------- Hifz (memorisation) ----------
+
+const getHifz = () => new Set(readStore(HIFZ_KEY, []) || []);
+
+function toggleHifz(surah) {
+  const set = getHifz();
+  if (set.has(surah)) set.delete(surah);
+  else set.add(surah);
+  writeStore(HIFZ_KEY, [...set].sort((a, b) => a - b));
+  return set.has(surah);
+}
+
+function renderHifz(surahs) {
+  const set = getHifz();
+  const verses = [...set].reduce((sum, n) => sum + (surahs?.[n - 1]?.numberOfAyahs || 0), 0);
+  $("hifz-title").textContent = `${set.size} of 114 surahs`;
+  $("hifz-bar").style.width = `${(verses / 6236) * 100}%`;
+  document.querySelector("#hifz .progress").setAttribute("aria-valuenow", verses);
+  $("hifz-status").textContent = set.size
+    ? `${verses.toLocaleString()} of 6,236 verses memorised.`
+    : "Mark a surah as memorised from its page. Most people begin with the short surahs at the end.";
+  // Suggest working backwards from An-Nas, the usual order for memorising
+  const next = Array.from({ length: 114 }, (_, i) => 114 - i).find((n) => !set.has(n));
+  $("hifz-next").hidden = !next || !surahs;
+  if (next && surahs) {
+    $("hifz-next").href = `quran.html?surah=${next}&practice=1`;
+    $("hifz-next").textContent = `Practise ${surahs[next - 1].englishName}`;
+  }
+  $("hifz-list").innerHTML = surahs
+    ? [...set].sort((a, b) => b - a).map((n) => `<a class="chip" href="quran.html?surah=${n}&practice=1">${n}. ${escapeHtml(surahs[n - 1].englishName)}</a>`).join("")
+    : "";
+}
+
+function renderPopular(surahs) {
+  $("popular-list").innerHTML = POPULAR.map((p) => {
+    const s = surahs[p.surah - 1];
+    const href = p.ayah ? `quran.html?surah=${p.surah}#ayah-${p.ayah}` : `quran.html?surah=${p.surah}`;
+    return `<a class="popular-card" href="${href}">
+      <span class="popular-ar" lang="ar" dir="rtl">${escapeHtml(p.ayah ? "آية الكرسي" : s.name.replace(/^سُورَةُ\s*/, ""))}</span>
+      <strong>${escapeHtml(p.label || s.englishName)}</strong>
+      <span class="muted small">${p.ayah ? `${s.englishName} ${p.surah}:${p.ayah}` : `${s.numberOfAyahs} verses`}</span>
+    </a>`;
+  }).join("");
+  tilt($("popular-list").children, 6);
+}
+
 // ---------- Index view ----------
 
 let paraData = null; // { starts, surahs } once loaded
 
 async function openIndex() {
+  renderRecentSearches();
   renderContinue();
   renderBookmarks();
   renderKhatam();
@@ -210,6 +262,8 @@ async function openIndex() {
   try {
     const [surahs, starts] = await Promise.all([getSurahs(), getJuzStarts()]);
     paraData = { surahs, ranges: paraRanges(starts, surahs) };
+    renderPopular(surahs);
+    renderHifz(surahs);
     renderSurahList(surahs);
     renderParaList();
     $("surah-filter").addEventListener("input", () => renderSurahList(surahs, $("surah-filter").value));
@@ -276,6 +330,7 @@ $("bookmarks-list").addEventListener("click", (e) => {
 
 function renderSurahList(surahs, filter = "") {
   const q = simplify(filter);
+  const hifz = getHifz();
   const shown = surahs.filter((s) =>
     !q ||
     String(s.number) === filter.trim() ||
@@ -292,7 +347,7 @@ function renderSurahList(surahs, filter = "") {
             <span class="muted">${escapeHtml(s.englishNameTranslation)}</span>
           </span>
           <span class="surah-ar" lang="ar" dir="rtl">${escapeHtml(s.name)}</span>
-          <span class="surah-meta muted">${s.revelationType === "Meccan" ? "Makki" : "Madani"} · ${s.numberOfAyahs} verses</span>
+          <span class="surah-meta muted">${s.revelationType === "Meccan" ? "Makki" : "Madani"} · ${s.numberOfAyahs} verses${hifz.has(s.number) ? ` · <span class="memorised">Memorised</span>` : ""}</span>
         </a>
       </li>`).join("")
     : `<li class="muted">No surah matches “${escapeHtml(filter)}”.</li>`;
@@ -331,10 +386,42 @@ function renderParaList() {
 
 let searchId = 0;
 
+const recentSearches = () => readStore(SEARCHES_KEY, []) || [];
+
+function renderRecentSearches() {
+  const list = recentSearches();
+  $("recent-searches").hidden = !list.length;
+  $("recent-searches").innerHTML = list.length
+    ? `<span class="muted small">Recent</span>` +
+      list.map((s, i) => `<button class="chip" type="button" data-i="${i}" ${s.lang.startsWith("ur") ? 'lang="ur" dir="rtl"' : ""}>${escapeHtml(s.q)}</button>`).join("") +
+      `<button class="text-btn small" type="button" data-clear>Clear</button>`
+    : "";
+}
+
+function rememberSearch(q, lang) {
+  const list = recentSearches().filter((s) => s.q.toLowerCase() !== q.toLowerCase());
+  writeStore(SEARCHES_KEY, [{ q, lang }, ...list].slice(0, 5));
+  renderRecentSearches();
+}
+
+$("recent-searches").addEventListener("click", (e) => {
+  if (e.target.closest("[data-clear]")) {
+    writeStore(SEARCHES_KEY, []);
+    return renderRecentSearches();
+  }
+  const btn = e.target.closest("button[data-i]");
+  if (!btn) return;
+  const { q, lang } = recentSearches()[Number(btn.dataset.i)];
+  $("search-q").value = q;
+  $("search-lang").value = lang;
+  search(q, lang);
+});
+
 async function search(query, edition) {
   const id = ++searchId;
   const q = query.trim();
   if (!q) return;
+  rememberSearch(q, edition);
   $("results").hidden = false;
   $("results-summary").textContent = "Searching…";
   $("results-list").innerHTML = "";
@@ -395,18 +482,27 @@ const reader = { mode: "surah", n: 0, items: [], audio: [] };
 // Verse ids: #ayah-5 inside a surah, #ayah-2-142 inside a para (which can span surahs)
 const ayahId = (item) => (reader.mode === "juz" ? `ayah-${item.surah}-${item.number}` : `ayah-${item.number}`);
 
+const options = (map, selected) =>
+  Object.entries(map).map(([id, name]) => `<option value="${id}"${id === String(selected) ? " selected" : ""}>${escapeHtml(name)}</option>`).join("");
+
 function applyReaderSettings() {
   const s = quranSettings();
   const view = $("reader-view");
   view.classList.toggle("hide-en", s.translation === "ur" || s.translation === "none");
   view.classList.toggle("hide-ur", s.translation === "en" || s.translation === "none");
+  view.classList.toggle("show-translit", s.transliteration);
+  view.classList.toggle("script-indopak", s.script === "indopak");
+  $("script").value = s.script || "uthmani";
   view.style.setProperty("--quran-scale", s.fontScale);
   $("translation").value = s.translation;
   $("reciter").value = s.reciter;
+  $("en-edition").value = s.enEdition;
+  $("ur-edition").value = s.urEdition;
+  $("translit-btn").setAttribute("aria-pressed", String(s.transliteration));
 }
 
-// Combine the Arabic, English and Urdu editions verse by verse.
-function buildItems(ar, en, ur, surahs) {
+// Combine the Arabic text, translations and transliteration verse by verse.
+function buildItems([ar, en, ur, tl], surahs) {
   return ar.map((a, i) => {
     const surah = a.surah?.number ?? reader.n;
     const split = splitBasmala(a.text, surah, a.numberInSurah);
@@ -417,9 +513,46 @@ function buildItems(ar, en, ur, surahs) {
       ar: split.text,
       en: en[i].text,
       ur: ur[i].text,
+      tl: tl[i].text,
       basmala: split.basmala,
     };
   });
+}
+
+// One request per surah (all editions at once); a para is fetched edition by edition.
+async function fetchTexts(mode, n) {
+  const editions = textEditions();
+  const surahs = await getSurahs();
+  let items;
+  if (mode === "surah") {
+    const { data } = await getJSON(`${QURAN_API}/surah/${n}/editions/${editions}`);
+    const byId = Object.fromEntries(data.map((d) => [d.edition.identifier, d.ayahs]));
+    items = buildItems(editions.map((ed) => byId[ed]), surahs);
+  } else {
+    const parts = await Promise.all(editions.map((ed) => getJSON(`${QURAN_API}/juz/${n}/${ed}`)));
+    items = buildItems(parts.map((p) => p.data.ayahs), surahs);
+  }
+  return quranSettings().script === "indopak" ? withIndoPak(items, mode, n) : items;
+}
+
+// Indo-Pak script (as printed in Pakistan and India) comes from Quran.com.
+// Its verses never include the Bismillah, which is taken from Al-Fatiha 1:1.
+async function withIndoPak(items, mode, n) {
+  const query = mode === "surah" ? `chapter_number=${n}` : `juz_number=${n}`;
+  const [{ verses }, opening] = await Promise.all([
+    getJSON(`${QURAN_COM_API}/quran/verses/indopak?${query}`),
+    getJSON(`${QURAN_COM_API}/quran/verses/indopak?verse_key=1:1`),
+  ]);
+  // Drop direction marks, and private-use codes the font has no glyph for
+  // (they sit beside a standard pause mark, which is kept)
+  const clean = (text) => text.replace(/[\u200e\u200f\ue000-\uf8ff]/g, "").trim();
+  const byKey = new Map(verses.map((v) => [v.verse_key, clean(v.text_indopak)]));
+  const basmala = clean(opening.verses[0].text_indopak);
+  return items.map((item) => ({
+    ...item,
+    ar: byKey.get(`${item.surah}:${item.number}`) || item.ar,
+    basmala: item.basmala && basmala,
+  }));
 }
 
 async function openReader(mode, n) {
@@ -429,25 +562,25 @@ async function openReader(mode, n) {
   reader.n = n;
   $("play-surah").textContent = `Play ${mode === "juz" ? "para" : "surah"}`;
 
-  $("reciter").innerHTML = Object.entries(RECITERS)
-    .map(([id, name]) => `<option value="${id}">${name}</option>`).join("");
+  $("reciter").innerHTML = options(RECITERS);
+  $("en-edition").innerHTML = options(EN_TRANSLATIONS);
+  $("ur-edition").innerHTML = options(UR_TRANSLATIONS);
+  $("tafsir-source").innerHTML = Object.entries(TAFSIRS)
+    .map(([id, t]) => `<option value="${id}">${escapeHtml(t.name)} · ${t.lang === "ur" ? "Urdu" : "English"}</option>`).join("");
   applyReaderSettings();
 
   try {
     const surahs = await getSurahs();
+    reader.items = await fetchTexts(mode, n);
     if (mode === "surah") {
-      const texts = await getJSON(`${QURAN_API}/surah/${n}/editions/${TEXT_EDITIONS}`);
-      const [ar, en, ur] = texts.data;
-      reader.items = buildItems(ar.ayahs, en.ayahs, ur.ayahs, surahs);
       renderSurahHead(surahs[n - 1], surahs);
       const basmala = reader.items[0].basmala;
       $("basmala").textContent = basmala || "";
       $("basmala").hidden = !basmala;
+      $("info-btn").hidden = false;
+      renderHifzButton();
+      if (new URLSearchParams(location.search).has("practice")) startPractice();
     } else {
-      const [ar, en, ur] = await Promise.all(
-        TEXT_EDITIONS.split(",").map((ed) => getJSON(`${QURAN_API}/juz/${n}/${ed}`))
-      );
-      reader.items = buildItems(ar.data.ayahs, en.data.ayahs, ur.data.ayahs, surahs);
       renderJuzHead(n);
       renderJuzComplete();
     }
@@ -539,16 +672,22 @@ function renderAyahs() {
           <button class="icon-btn small-btn" data-action="play" type="button" aria-label="Play from verse ${a.surah}:${a.number}" disabled>${ICONS.play}</button>
           <button class="icon-btn small-btn${marked ? " active" : ""}" data-action="bookmark" type="button"
             aria-label="Bookmark verse ${a.surah}:${a.number}" aria-pressed="${marked}">${ICONS.bookmark}</button>
+          <button class="icon-btn small-btn" data-action="tafsir" type="button" aria-label="Tafsir of verse ${a.surah}:${a.number}" title="Tafsir">${ICONS.tafsir}</button>
+          <button class="icon-btn small-btn" data-action="share" type="button" aria-label="Share verse ${a.surah}:${a.number} as an image" title="Share as image">${ICONS.share}</button>
           <button class="icon-btn small-btn" data-action="copy" type="button" aria-label="Copy verse ${a.surah}:${a.number}">${ICONS.copy}</button>
           <button class="icon-btn small-btn" data-action="link" type="button" aria-label="Copy link to verse ${a.surah}:${a.number}">${ICONS.link}</button>
         </div>
       </div>
       <p class="quran-text" lang="ar" dir="rtl">${escapeHtml(a.ar)} <span class="ayah-end">${arabicNumber(a.number)}</span></p>
+      <p class="translit">${escapeHtml(a.tl)}</p>
       <p class="translation tr-en">${escapeHtml(a.en)}</p>
       <p class="translation tr-ur urdu" lang="ur" dir="rtl">${escapeHtml(a.ur)}</p>
     </article>`;
   });
   $("ayahs").innerHTML = html;
+  setAudioReady(reader.audio.length > 0);
+  renderPlayState();
+  document.querySelector(`.ayah[data-index="${player.index}"]`)?.classList.add("playing");
 }
 
 function scrollToHash() {
@@ -602,6 +741,10 @@ $("ayahs").addEventListener("click", async (e) => {
     btn.classList.toggle("active", added);
     btn.setAttribute("aria-pressed", String(added));
     toast(added ? "Verse bookmarked." : "Bookmark removed.");
+  } else if (btn.dataset.action === "tafsir") {
+    openTafsir(index);
+  } else if (btn.dataset.action === "share") {
+    shareVerse(a);
   } else if (btn.dataset.action === "copy") {
     await copyText(copyPayload(a));
     toast("Verse copied.");
@@ -616,6 +759,54 @@ $("ayahs").addEventListener("click", async (e) => {
 $("translation").addEventListener("change", () => {
   saveQuranSettings({ translation: $("translation").value });
   applyReaderSettings();
+});
+
+// The verse at the top of the screen, so a re-render can return to it
+function firstVisibleIndex() {
+  const el = [...document.querySelectorAll(".ayah")].find((a) => a.getBoundingClientRect().bottom > 140);
+  return el ? Number(el.dataset.index) : 0;
+}
+
+async function changeEditions(update) {
+  saveQuranSettings(update);
+  applyReaderSettings();
+  const index = firstVisibleIndex();
+  const offset = document.querySelector(`.ayah[data-index="${index}"]`)?.getBoundingClientRect().top ?? 0;
+  document.body.classList.add("loading");
+  try {
+    reader.items = await fetchTexts(reader.mode, reader.n);
+    renderAyahs();
+    const el = document.querySelector(`.ayah[data-index="${index}"]`);
+    if (el && index > 0) scrollBy(0, el.getBoundingClientRect().top - offset);
+    toast(update.script
+      ? `Arabic script: ${update.script === "indopak" ? "Indo-Pak" : "Uthmani"}`
+      : `Translation: ${update.enEdition ? EN_TRANSLATIONS[update.enEdition] : UR_TRANSLATIONS[update.urEdition]}`);
+  } catch (err) {
+    toast(`Couldn't load that ${update.script ? "script" : "translation"}. ${err.message}`, 5000);
+  } finally {
+    document.body.classList.remove("loading");
+  }
+}
+
+$("en-edition").addEventListener("change", () => changeEditions({ enEdition: $("en-edition").value }));
+$("ur-edition").addEventListener("change", () => changeEditions({ urEdition: $("ur-edition").value }));
+
+$("script").addEventListener("change", async () => {
+  await changeEditions({ script: $("script").value });
+  // The Bismillah heading follows the script too
+  const basmala = reader.items[0]?.basmala;
+  if (reader.mode === "surah" && basmala) $("basmala").textContent = basmala;
+});
+
+$("translit-btn").addEventListener("click", () => {
+  saveQuranSettings({ transliteration: !quranSettings().transliteration });
+  applyReaderSettings();
+});
+
+$("more-btn").addEventListener("click", () => {
+  const open = $("reader-more").hidden;
+  $("reader-more").hidden = !open;
+  $("more-btn").setAttribute("aria-expanded", String(open));
 });
 
 $("reciter").addEventListener("change", async () => {
@@ -633,9 +824,131 @@ function changeFont(step) {
 $("font-down").addEventListener("click", () => changeFont(-0.1));
 $("font-up").addEventListener("click", () => changeFont(0.1));
 
+// ---------- Hifz in the reader ----------
+
+function renderHifzButton() {
+  const on = getHifz().has(reader.n);
+  $("hifz-btn").hidden = false;
+  $("hifz-btn").setAttribute("aria-pressed", String(on));
+  $("hifz-btn").textContent = on ? "Memorised" : "Mark as memorised";
+}
+
+$("hifz-btn").addEventListener("click", () => {
+  const on = toggleHifz(reader.n);
+  renderHifzButton();
+  toast(on ? `${reader.items[0].name} marked as memorised. MashaAllah.` : "Removed from memorised.");
+});
+
+// Practice mode: each verse repeats 3 times, starting from the first verse
+function startPractice() {
+  player.repeat = 3;
+  renderRepeat();
+  toast("Practice: each verse plays 3 times. Press Play surah to begin.", 5000);
+}
+
+// ---------- Surah introduction ----------
+
+const infoCache = new Map();
+
+async function showSurahInfo(lang) {
+  $("info-en").setAttribute("aria-selected", String(lang === "en"));
+  $("info-ur").setAttribute("aria-selected", String(lang === "ur"));
+  const text = $("info-text");
+  const urdu = lang === "ur";
+  text.classList.toggle("urdu-rich", urdu);
+  text.lang = urdu ? "ur" : "en";
+  text.dir = urdu ? "rtl" : "ltr";
+  text.innerHTML = `<p class="muted">Loading…</p>`;
+  const key = `${reader.n}-${lang}`;
+  try {
+    if (!infoCache.has(key)) infoCache.set(key, getJSON(`${QURAN_COM_API}/chapters/${reader.n}/info?language=${lang}`));
+    const { chapter_info: info } = await infoCache.get(key);
+    if (!$("info-" + lang).matches('[aria-selected="true"]')) return;
+    text.innerHTML = sanitizeHtml(info.text);
+    $("info-source").textContent = info.source ? `Source: ${info.source.replace(/\s+-\s+/g, " · ")}` : "";
+  } catch (err) {
+    infoCache.delete(key);
+    text.innerHTML = `<p class="error">Couldn't load the introduction. ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+$("info-btn").addEventListener("click", () => {
+  const open = $("surah-info").hidden;
+  $("surah-info").hidden = !open;
+  $("info-btn").setAttribute("aria-expanded", String(open));
+  if (open && !$("info-text").childElementCount) showSurahInfo(quranSettings().translation === "ur" ? "ur" : "en");
+});
+$("info-en").addEventListener("click", () => showSurahInfo("en"));
+$("info-ur").addEventListener("click", () => showSurahInfo("ur"));
+
+// ---------- Tafsir ----------
+
+const tafsirCache = new Map();
+const tafsir = { index: -1, groupEnd: -1 };
+const verseKey = (a) => `${a.surah}:${a.number}`;
+
+async function openTafsir(index) {
+  const a = reader.items[index];
+  if (!a) return;
+  tafsir.index = index;
+  tafsir.groupEnd = index;
+  const source = Number(quranSettings().tafsir);
+  const urdu = TAFSIRS[source].lang === "ur";
+  $("tafsir-source").value = source;
+  $("tafsir-title").textContent = `${a.name} ${verseKey(a)}`;
+  $("tafsir-verse").textContent = a.ar;
+  $("tafsir-covers").hidden = true;
+  $("tafsir-prev").disabled = index === 0;
+  $("tafsir-next").disabled = index === reader.items.length - 1;
+  const text = $("tafsir-text");
+  text.classList.toggle("urdu-rich", urdu);
+  text.lang = urdu ? "ur" : "en";
+  text.dir = urdu ? "rtl" : "ltr";
+  text.innerHTML = `<p class="muted">Loading…</p>`;
+  $("tafsir-body").scrollTop = 0;
+  if (!$("tafsir").open) $("tafsir").showModal();
+
+  const key = `${source}/${verseKey(a)}`;
+  try {
+    if (!tafsirCache.has(key)) tafsirCache.set(key, getJSON(`${QURAN_COM_API}/tafsirs/${source}/by_ayah/${verseKey(a)}`));
+    const { tafsir: data } = await tafsirCache.get(key);
+    if (tafsir.index !== index || Number(quranSettings().tafsir) !== source) return;
+
+    // Commentary is often written for a passage, not a single verse.
+    const covered = Object.keys(data.verses || {});
+    if (covered.length > 1) {
+      $("tafsir-covers").textContent = `This commentary covers verses ${covered[0]} to ${covered.at(-1)}.`;
+      $("tafsir-covers").hidden = false;
+      const last = reader.items.findIndex((item) => verseKey(item) === covered.at(-1));
+      tafsir.groupEnd = Math.max(index, last);
+      $("tafsir-next").disabled = tafsir.groupEnd >= reader.items.length - 1;
+    }
+    text.innerHTML = data.text?.trim()
+      ? sanitizeHtml(data.text)
+      : `<p class="muted">${escapeHtml(TAFSIRS[source].name)} has no separate note on this verse. It is usually explained with the verses around it.</p>`;
+  } catch (err) {
+    tafsirCache.delete(key);
+    text.innerHTML = `<p class="error">Couldn't load the tafsir. ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+$("tafsir-source").addEventListener("change", () => {
+  saveQuranSettings({ tafsir: Number($("tafsir-source").value) });
+  openTafsir(tafsir.index);
+});
+$("tafsir-prev").addEventListener("click", () => openTafsir(tafsir.index - 1));
+$("tafsir-next").addEventListener("click", () => openTafsir(tafsir.groupEnd + 1));
+$("tafsir-close").addEventListener("click", () => $("tafsir").close());
+// A click on the dimmed backdrop lands on the dialog itself, outside its box
+$("tafsir").addEventListener("click", (e) => {
+  if (e.target !== $("tafsir")) return;
+  const r = $("tafsir").getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) $("tafsir").close();
+});
+
 // ---------- Audio ----------
 
-const player = { audio: new Audio(), index: -1 };
+const player = { audio: new Audio(), index: -1, repeat: 1, plays: 1 };
 
 async function loadAudio() {
   const reciter = quranSettings().reciter;
@@ -660,8 +973,11 @@ function playAyah(index) {
   const url = reader.audio[index];
   if (!url) return;
   player.index = index;
+  player.plays = 1;
+  renderRepeat();
   player.audio.src = url;
-  player.audio.play().catch(() => {
+  player.audio.play().catch((err) => {
+    if (err.name === "AbortError") return; // replaced by the next verse
     toast("Couldn't play the recitation.");
     renderPlayState();
   });
@@ -711,6 +1027,14 @@ function renderPlayState() {
 player.audio.addEventListener("play", renderPlayState);
 player.audio.addEventListener("pause", renderPlayState);
 player.audio.addEventListener("ended", () => {
+  // Repeat the same verse for memorising before moving on
+  if (player.plays < player.repeat) {
+    player.plays++;
+    renderRepeat();
+    player.audio.currentTime = 0;
+    player.audio.play().catch(() => {});
+    return;
+  }
   if (player.index < reader.items.length - 1) playAyah(player.index + 1);
   else {
     stopPlayer();
@@ -727,6 +1051,97 @@ $("player-toggle").addEventListener("click", () => (player.audio.paused ? player
 $("player-prev").addEventListener("click", () => player.index > 0 && playAyah(player.index - 1));
 $("player-next").addEventListener("click", () => player.index < reader.items.length - 1 && playAyah(player.index + 1));
 $("player-close").addEventListener("click", stopPlayer);
+
+// ---------- Repeat and sleep timer ----------
+
+const REPEATS = [1, 3, 5, 10];
+const SLEEP_MINUTES = [0, 15, 30, 60];
+const sleep = { minutes: 0, endsAt: 0, timer: 0 };
+
+function renderRepeat() {
+  const on = player.repeat > 1;
+  $("repeat-label").textContent = on ? `${Math.min(player.plays, player.repeat)} of ${player.repeat}` : "1×";
+  $("player-repeat").setAttribute("aria-pressed", String(on));
+  $("player-repeat").setAttribute("aria-label", on ? `Repeat each verse ${player.repeat} times` : "Repeat each verse");
+}
+
+$("player-repeat").addEventListener("click", () => {
+  player.repeat = REPEATS[(REPEATS.indexOf(player.repeat) + 1) % REPEATS.length];
+  player.plays = Math.min(player.plays, player.repeat);
+  renderRepeat();
+  toast(player.repeat > 1 ? `Each verse plays ${player.repeat} times.` : "Repeat off.");
+});
+
+function renderSleep() {
+  const left = sleep.endsAt ? Math.max(1, Math.ceil((sleep.endsAt - Date.now()) / 60000)) : 0;
+  $("sleep-label").textContent = left ? `${left} min` : "Off";
+  $("player-sleep").setAttribute("aria-pressed", String(!!left));
+}
+
+$("player-sleep").addEventListener("click", () => {
+  sleep.minutes = SLEEP_MINUTES[(SLEEP_MINUTES.indexOf(sleep.minutes) + 1) % SLEEP_MINUTES.length];
+  clearInterval(sleep.timer);
+  sleep.endsAt = sleep.minutes ? Date.now() + sleep.minutes * 60000 : 0;
+  if (sleep.minutes) {
+    sleep.timer = setInterval(() => {
+      if (Date.now() < sleep.endsAt) return renderSleep();
+      clearInterval(sleep.timer);
+      sleep.minutes = 0;
+      sleep.endsAt = 0;
+      player.audio.pause();
+      renderSleep();
+      toast("Sleep timer ended. Recitation paused.");
+    }, 15000);
+  }
+  renderSleep();
+  toast(sleep.minutes ? `Recitation will stop in ${sleep.minutes} minutes.` : "Sleep timer off.");
+});
+
+// ---------- Share as image ----------
+
+function shareVerse(a) {
+  return shareCard({
+    label: "The Holy Quran",
+    ar: a.ar,
+    arFont: quranSettings().script === "indopak" ? "IndoPak" : "Amiri Quran",
+    ...cardTranslation(a.en, a.ur),
+    ref: `${a.name} ${a.surah}:${a.number}`,
+  }).catch((err) => toast(`Couldn't create the image. ${err.message}`));
+}
+
+// ---------- Keyboard shortcuts (reader) ----------
+
+// The verse being recited, or else the first one on screen
+const currentIndex = () => (player.index >= 0 ? player.index : firstVisibleIndex());
+
+function goToVerse(index) {
+  if (index < 0 || index >= reader.items.length) return;
+  if (player.index >= 0) return playAyah(index);
+  const el = document.querySelector(`.ayah[data-index="${index}"]`);
+  el.scrollIntoView({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
+  replay(el, "flash");
+}
+
+document.addEventListener("keydown", (e) => {
+  if ($("reader-view").hidden || $("tafsir").open || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest("input, select, textarea, button, a")) {
+    if (e.key === " " || e.target.closest("input, select, textarea")) return;
+  }
+  const index = currentIndex();
+  const a = reader.items[index];
+  const actions = {
+    " ": () => (player.index < 0 ? reader.audio.length && playAyah(index) : player.audio.paused ? player.audio.play().catch(() => {}) : player.audio.pause()),
+    ArrowRight: () => goToVerse(index + 1),
+    ArrowLeft: () => goToVerse(index - 1),
+    b: () => document.querySelector(`.ayah[data-index="${index}"] [data-action="bookmark"]`)?.click(),
+    t: () => a && openTafsir(index),
+    s: () => a && shareVerse(a),
+  };
+  const action = actions[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+  if (!action) return;
+  e.preventDefault();
+  action();
+});
 
 // ---------- Start ----------
 

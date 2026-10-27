@@ -70,13 +70,14 @@ function timesParams(place) {
     method: $("method").value,
     school: $("school").value,
     timezonestring: place.timezone,
+    ...(tuneParam() && { tune: tuneParam() }),
   });
 }
 
 // Offline fallback: this month's and next month's times, saved once a day.
 const TIMES_CACHE_KEY = "times-cache";
 const timesCacheKey = (place) =>
-  `${place.lat.toFixed(3)},${place.lng.toFixed(3)},${$("method").value},${$("school").value}`;
+  `${place.lat.toFixed(3)},${place.lng.toFixed(3)},${$("method").value},${$("school").value},${tuneParam() || ""}`;
 
 async function cacheMonths(place) {
   const key = timesCacheKey(place);
@@ -199,19 +200,110 @@ function syncUrl(place) {
   history.replaceState(null, "", url);
 }
 
+// ---------- Share today's times ----------
+
+async function sharePrayerTimes() {
+  const W = 1080, H = 1350, PAD = 96;
+  await Promise.all(['60px "Instrument Serif"', '30px "Geist"', '30px "Noto Naskh Arabic"'].map((f) => document.fonts.load(f).catch(() => null)));
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0b0e1a";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(216, 180, 110, 0.35)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(40, 40, W - 80, H - 80);
+
+  const { date, timings } = state.today;
+  const [d, m, y] = date.gregorian.date.split("-").map(Number);
+  ctx.fillStyle = "#d8b46e";
+  ctx.font = '500 26px "Geist", sans-serif';
+  ctx.fillText("PRAYER TIMES", PAD, PAD + 30);
+  ctx.fillStyle = "#f2eee3";
+  ctx.font = '76px "Instrument Serif", serif';
+  ctx.fillText(state.place.label, PAD, PAD + 130, W - PAD * 2);
+  ctx.fillStyle = "#9ea2b4";
+  ctx.font = '30px "Geist", sans-serif';
+  ctx.fillText(`${date.gregorian.weekday.en}, ${date.readable} · ${hijriLabel(hijriFor(y, m, d))}`, PAD, PAD + 190, W - PAD * 2);
+
+  const rowH = 128;
+  let top = PAD + 260;
+  PRAYERS.forEach((name, i) => {
+    const yRow = top + i * rowH;
+    if (i) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.fillRect(PAD, yRow, W - PAD * 2, 2);
+    }
+    const sunrise = name === "Sunrise";
+    ctx.textAlign = "left";
+    ctx.fillStyle = sunrise ? "#9ea2b4" : "#f2eee3";
+    ctx.font = '500 40px "Geist", sans-serif';
+    ctx.fillText(name, PAD, yRow + 78);
+    ctx.fillStyle = "#9ea2b4";
+    ctx.font = '32px "Noto Naskh Arabic", serif';
+    ctx.fillText(ARABIC[name], PAD + 260, yRow + 78);
+    const [clock, suffix] = to12h(timings[name]);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#9ea2b4";
+    ctx.font = '500 26px "Geist", sans-serif';
+    ctx.fillText(suffix, W - PAD, yRow + 78);
+    const suffixW = ctx.measureText(suffix).width;
+    ctx.fillStyle = sunrise ? "#9ea2b4" : "#d8b46e";
+    ctx.font = '60px "Geist", sans-serif';
+    ctx.fillText(clock, W - PAD - suffixW - 14, yRow + 80);
+  });
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#9ea2b4";
+  ctx.font = '26px "Geist", sans-serif';
+  const { method = "1", school = "1" } = loadSettings();
+  ctx.fillText(`${METHOD_NAMES[method] || "Karachi"} method · ${school === "1" ? "Hanafi" : "Standard"} Asr${tuneParam() ? " · adjusted" : ""}`, PAD, H - PAD - 10);
+  ctx.textAlign = "right";
+  ctx.font = '40px "Instrument Serif", serif';
+  ctx.fillText("Tilawave", W - PAD, H - PAD - 8);
+
+  const text = `Prayer times for ${state.place.label}, ${date.readable}\n` +
+    PRAYERS.map((p) => `${p}: ${to12h(timings[p]).join(" ")}`).join("\n");
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  const file = new File([blob], `prayer-times-${date.gregorian.date}.png`, { type: "image/png" });
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], text });
+      return;
+    } catch (err) {
+      if (err.name === "AbortError") return;
+    }
+  }
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = file.name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  await copyText(text);
+  toast("Image saved, and the times copied as text.");
+}
+
+$("share-times").addEventListener("click", () =>
+  sharePrayerTimes().catch((err) => toast(`Couldn't create the image. ${err.message}`)));
+
 function renderHeader() {
   const { date, timings } = state.today;
+  const [d, m, y] = date.gregorian.date.split("-").map(Number);
+  const hijri = hijriFor(y, m, d);
   $("location").textContent = state.place.label;
   $("dates").innerHTML =
     `${date.gregorian.weekday.en}, ${date.readable}` +
-    `<span class="hijri">${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH</span>`;
+    `<span class="hijri">${hijriLabel(hijri)}</span>`;
 
   // During Ramadan, show when Sehri ends (Fajr) and Iftar begins (Maghrib).
-  const ramadan = date.hijri.month.number === 9;
+  const ramadan = hijri.month === 9;
+  $("share-times").disabled = false;
+  $("tune-link").textContent = tuneParam() ? "Adjusted times · change" : "Adjust times";
   $("ramadan").hidden = !ramadan;
   if (ramadan) {
     $("ramadan").textContent =
-      `Ramadan day ${Number(date.hijri.day)} · Sehri ends ${to12h(timings.Fajr).join(" ")} · ` +
+      `Ramadan day ${hijri.day} · Sehri ends ${to12h(timings.Fajr).join(" ")} · ` +
       `Iftar ${to12h(timings.Maghrib).join(" ")}`;
   }
 }
@@ -219,13 +311,14 @@ function renderHeader() {
 const CHECK_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>`;
 
 // Small line icons showing where the sun is at each prayer
+// Drawn on a 32×32 grid. Each prayer has its own colour (set in CSS by li.p-Name).
 const SKY_ICONS = {
-  Fajr: `<path d="M3 17h18" /><path d="M8.5 17a3.5 3.5 0 0 1 7 0" /><path d="M12 9.5v2M7.3 12.2l1.2 1.1M16.7 12.2l-1.2 1.1" class="rays" />`,
-  Sunrise: `<path d="M3 17h18" /><path d="M7 17a5 5 0 0 1 10 0" /><path d="M12 3.5v5M9.8 5.7 12 3.5l2.2 2.2" class="lift" />`,
-  Dhuhr: `<circle cx="12" cy="12" r="3.6" /><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6" class="rays" />`,
-  Asr: `<path d="M3 19h18" /><circle cx="16" cy="8" r="3" /><path d="M7 19v-6" /><path d="M7 19l5.5-2.2" class="shadow" />`,
-  Maghrib: `<path d="M3 17h18" /><path d="M7 17a5 5 0 0 1 10 0" /><path d="M12 3.5v5M9.8 6.3 12 8.5l2.2-2.2" class="sink" />`,
-  Isha: `<path d="M14.5 4.5a7.5 7.5 0 1 0 5 12.6A6 6 0 0 1 14.5 4.5z" /><path d="M18.5 3.5l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z" class="twinkle" />`,
+  Fajr: `<path d="M9.5 19.5a6.5 6.5 0 0 1 13 0" /><path d="M4 19.5h24M8 23.5h16M12 27.5h8" /><path class="rays" d="M16 6.5v3M7.6 10l2 2M24.4 10l-2 2M3.8 15l2.7.8M28.2 15l-2.7.8" />`,
+  Sunrise: `<circle cx="16" cy="16" r="5.5" /><path class="rays" d="M16 3.5V7M16 25v3.5M3.5 16H7M25 16h3.5M7.2 7.2l2.5 2.5M22.3 22.3l2.5 2.5M7.2 24.8l2.5-2.5M22.3 9.7l2.5-2.5" />`,
+  Dhuhr: `<circle class="core" cx="16" cy="16" r="6" /><path class="rays" d="M16 3v3.5M16 25.5V29M3 16h3.5M25.5 16H29M6.8 6.8l2.5 2.5M22.7 22.7l2.5 2.5M6.8 25.2l2.5-2.5M22.7 9.3l2.5-2.5" />`,
+  Asr: `<circle cx="12.5" cy="12" r="4.8" /><path class="rays" d="M12.5 3.5v2M5 6.2l1.4 1.4M4 12h2M20 6.2l-1.4 1.4" /><path class="cloud" d="M11 26.5h12.5a4.5 4.5 0 0 0 .5-9 6.5 6.5 0 0 0-12.3 1.9A3.6 3.6 0 0 0 11 26.5z" />`,
+  Maghrib: `<path d="M9.5 18.5a6.5 6.5 0 0 1 13 0" /><path d="M4 18.5h24M7 22.5h18M10.5 26.5h11" /><path class="sink" d="M16 5.5v6M13.2 8.8l2.8 2.8 2.8-2.8" />`,
+  Isha: `<path d="M19.5 4.8a11.5 11.5 0 1 0 7.7 17.4A9.5 9.5 0 0 1 19.5 4.8z" /><path class="twinkle" d="M24 5.5l.9 1.9 2.1.3-1.5 1.5.4 2.1-1.9-1-1.9 1 .4-2.1-1.5-1.5 2.1-.3z" />`,
 };
 
 // Fard rak'ahs, which every school agrees on
@@ -273,6 +366,7 @@ function renderTimes() {
     const isNow = current?.name === name;
     const classes = [
       "prayer",
+      `p-${name}`,
       name === "Sunrise" && "sunrise",
       isNow && "now",
       isNext ? "next" : started && !isNow && "passed",
@@ -297,11 +391,8 @@ function renderTimes() {
     return `<li class="${classes}">
       <div class="tile">
         <div class="face front">
-          <div class="tile-top">
-            <svg class="sky-icon" viewBox="0 0 24 24" aria-hidden="true">${SKY_ICONS[name]}</svg>
-            ${isNow ? `<span class="now-badge">Now</span>` : isNext ? `<span class="next-badge">Next</span>` : ""}
-          </div>
-          <div class="prayer-name"><span class="name">${name}</span><span class="arabic" lang="ar">${ARABIC[name]}</span></div>
+          <svg class="sky-icon" viewBox="0 0 32 32" aria-hidden="true">${SKY_ICONS[name]}</svg>
+          <div class="prayer-name"><span class="name">${name}${isNow ? `<span class="visually-hidden"> (now)</span>` : isNext ? `<span class="visually-hidden"> (next)</span>` : ""}</span><span class="arabic" lang="ar">${ARABIC[name]}</span></div>
           <span class="time">${clock}<small>${suffix}</small></span>
           ${isNow ? `<div class="window" aria-label="Time left to pray ${name}">
               <div class="window-bar"><span></span></div>
@@ -402,12 +493,274 @@ function renderTracker() {
   </tr>`).join("");
 }
 
+// ---------- Qada: prayers to make up ----------
+
+const QADA_KEY = "qada"; // { counts: { Fajr: 3, ... }, imported: ["2026-10-01|Fajr", ...] }
+const loadQada = () => ({ counts: {}, imported: [], ...readStore(QADA_KEY, {}) });
+
+// Past days (up to 30, from the first tracked day) with prayers left unmarked
+function unmarkedPrayers() {
+  const log = prayerLog();
+  const firstDay = Object.keys(log).sort()[0];
+  const imported = new Set(loadQada().imported);
+  const found = [];
+  for (let i = 1; firstDay && i <= 30; i++) {
+    const key = localDateKey(daysAgo(i));
+    if (key < firstDay) break;
+    for (const p of FARD) if (!(log[key] || []).includes(p) && !imported.has(`${key}|${p}`)) found.push(`${key}|${p}`);
+  }
+  return found;
+}
+
+function renderQada() {
+  const { counts } = loadQada();
+  const total = FARD.reduce((sum, p) => sum + (counts[p] || 0), 0);
+  $("qada-total").textContent = `${total.toLocaleString()} prayer${total === 1 ? "" : "s"}`;
+  $("qada-list").innerHTML = FARD.map((p) => {
+    const n = counts[p] || 0;
+    return `<li>
+      <span class="qada-name">${p}</span>
+      <span class="qada-count">${n}</span>
+      <button class="icon-btn small-btn" type="button" data-qada="${p}" data-step="1" aria-label="Add a missed ${p}">+</button>
+      <button class="chip" type="button" data-qada="${p}" data-step="-1" ${n ? "" : "disabled"}>Made up</button>
+    </li>`;
+  }).join("");
+  const pending = unmarkedPrayers().length;
+  $("qada-import").hidden = !pending;
+  $("qada-import").textContent = `Add ${pending} unmarked from tracker`;
+}
+
+$("qada-list").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-qada]");
+  if (!btn) return;
+  const q = loadQada();
+  const p = btn.dataset.qada;
+  q.counts[p] = Math.max(0, (q.counts[p] || 0) + Number(btn.dataset.step));
+  writeStore(QADA_KEY, q);
+  renderQada();
+  if (btn.dataset.step === "-1") toast(`${p} made up. May Allah accept it.`);
+});
+
+$("qada-import").addEventListener("click", () => {
+  const q = loadQada();
+  const found = unmarkedPrayers();
+  for (const key of found) {
+    const p = key.split("|")[1];
+    q.counts[p] = (q.counts[p] || 0) + 1;
+  }
+  q.imported = [...q.imported, ...found].slice(-2000);
+  writeStore(QADA_KEY, q);
+  renderQada();
+  toast(`${found.length} prayer${found.length === 1 ? "" : "s"} added to qada.`);
+});
+
+// ---------- Nearby mosques (OpenStreetMap) ----------
+
+// Public Overpass servers are often busy, so try each in turn, then fall back to Nominatim search
+const OVERPASS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+];
+const NOMINATIM = "https://nominatim.openstreetmap.org/search";
+
+async function fetchWithTimeout(url, options = {}, ms = 9000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { ...options, signal: ctrl.signal });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Mosques within radius metres: [{ name, lat, lng }]
+async function mosquesAround(from, radius) {
+  const query = `[out:json][timeout:15];nwr["amenity"="place_of_worship"]["religion"="muslim"](around:${radius},${from.lat},${from.lng});out center 60;`;
+  for (const url of OVERPASS) {
+    const json = await fetchWithTimeout(url, { method: "POST", body: new URLSearchParams({ data: query }) });
+    if (json?.elements) {
+      return json.elements.map((el) => ({
+        name: el.tags?.["name:en"] || el.tags?.name,
+        lat: el.lat ?? el.center?.lat,
+        lng: el.lon ?? el.center?.lon,
+      }));
+    }
+  }
+  const d = radius / 111000; // metres to degrees, roughly
+  const box = [from.lng - d, from.lat + d, from.lng + d, from.lat - d].map((n) => n.toFixed(5)).join(",");
+  const json = await fetchWithTimeout(`${NOMINATIM}?q=mosque&format=jsonv2&limit=40&bounded=1&accept-language=en&viewbox=${box}`);
+  if (!json) throw new Error("The map service is busy. Please try again in a minute.");
+  return json
+    .filter((r) => r.type === "place_of_worship")
+    .map((r) => ({ name: r.name, lat: Number(r.lat), lng: Number(r.lon) }));
+}
+
+function distanceKm(a, b) {
+  const rad = Math.PI / 180;
+  const h = Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 +
+    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lng - a.lng) * rad) / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+
+async function findMosques() {
+  const btn = $("mosques-btn");
+  btn.disabled = true;
+  $("mosques-status").textContent = "Finding your location…";
+  let from;
+  let approximate = false;
+  try {
+    const { coords } = await getPosition();
+    from = { lat: coords.latitude, lng: coords.longitude };
+  } catch (err) {
+    if (!state.place) {
+      $("mosques-status").textContent = err.message;
+      btn.disabled = false;
+      return;
+    }
+    from = { lat: state.place.lat, lng: state.place.lng };
+    approximate = true;
+  }
+  $("mosques-status").textContent = "Searching the map…";
+  try {
+    let mosques = [];
+    for (const radius of [3000, 10000]) {
+      mosques = (await mosquesAround(from, radius))
+        .filter((m) => m.lat != null)
+        .map((m) => ({ ...m, name: m.name || "Mosque" }))
+        .map((m) => ({ ...m, km: distanceKm(from, m) }))
+        .sort((a, b) => a.km - b.km)
+        // A mosque can be mapped twice (as a point and as a building)
+        .filter((m, i, all) => !all.slice(0, i).some((o) => o.name === m.name && distanceKm(o, m) < 0.15))
+        .slice(0, 8);
+      if (mosques.length >= 3) break;
+    }
+    const where = approximate ? `the centre of ${state.place.label} (location was not shared)` : "you";
+    $("mosques-status").textContent = mosques.length
+      ? `${mosques.length} closest to ${where}. From OpenStreetMap; check timings locally.`
+      : `No mosques are mapped within 10 km of ${where}.`;
+    $("mosques-list").innerHTML = mosques.map((m) => {
+      const dist = m.km < 1 ? `${Math.round(m.km * 1000 / 10) * 10} m` : `${m.km.toFixed(1)} km`;
+      const walk = Math.max(1, Math.round((m.km * 1000) / 80));
+      return `<li>
+        <span class="mosque-name">${escapeHtml(m.name)}</span>
+        <span class="muted small">${dist}${m.km < 3 ? ` · about ${walk} min walk` : ""}</span>
+        <a class="text-btn" href="https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}&travelmode=${m.km < 2 ? "walking" : "driving"}" target="_blank" rel="noopener">Directions</a>
+      </li>`;
+    }).join("");
+    reveal($("mosques-list").children);
+  } catch (err) {
+    $("mosques-status").textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Search again";
+  }
+}
+
+$("mosques-btn").addEventListener("click", findMosques);
+
 function onPrayerToggle(e) {
   const btn = e.target.closest("button[data-prayer]");
   if (!btn) return;
   togglePrayed(btn.dataset.date || localDateKey(), btn.dataset.prayer);
   if (state.today) renderTimes();
   renderTracker();
+  renderNotes();
+  renderQada();
+}
+
+// ---------- Today notes: Jummah, reading plan, unmarked prayers ----------
+
+const KAHF = 18;
+
+function jummahNote() {
+  if (new Date().getDay() !== 5) return null;
+  const last = readStore("quran-last-read", null);
+  const reading = last && !last.juz && last.surah === KAHF && last.ayah > 1;
+  return {
+    title: "It's Jummah",
+    text: reading ? `Continue Surah Al-Kahf from verse ${last.ayah}.` : "A Friday sunnah: read Surah Al-Kahf.",
+    href: reading ? `quran.html?surah=${KAHF}#ayah-${last.ayah}` : `quran.html?surah=${KAHF}`,
+    action: reading ? "Continue" : "Read Al-Kahf",
+  };
+}
+
+// Mirrors the khatam goal on the Quran page: by day d of a g-day goal, 30·d/g paras should be done.
+function readingNote() {
+  const k = { completed: [], goalDays: 0, goalStart: null, ...readStore("quran-khatam", {}) };
+  const done = k.completed.length;
+  if (done >= 30) return null;
+  const next = Array.from({ length: 30 }, (_, i) => i + 1).find((j) => !k.completed.includes(j));
+  const link = { href: `quran.html?juz=${next}`, action: `Read Para ${next}` };
+  if (!k.goalDays || !k.goalStart) {
+    return done ? { title: "Khatam", text: `${done} of 30 paras read. Para ${next} is next.`, ...link } : null;
+  }
+  const day = Math.round((Date.parse(`${localDateKey()}T00:00:00Z`) - Date.parse(`${k.goalStart}T00:00:00Z`)) / 86400000) + 1;
+  const target = Math.min(30, Math.ceil((30 * day) / k.goalDays));
+  const left = target - done;
+  const text = day > k.goalDays
+    ? `Your ${k.goalDays}-day goal has passed. ${30 - done} paras to go.`
+    : left > 0
+      ? `Read ${left} para${left === 1 ? "" : "s"} today to stay on your ${k.goalDays}-day khatam.`
+      : `You're on track with your ${k.goalDays}-day khatam. MashaAllah.`;
+  return { title: "Today's reading", text, ...link };
+}
+
+// After Isha begins, list today's prayers that have started but aren't ticked yet
+function trackerNote() {
+  if (!state.today || dateIn(state.place.timezone) !== state.dateKey) return null;
+  const now = nowSeconds();
+  if (now < toSeconds(state.today.timings.Isha)) return null;
+  const done = prayedOn(localDateKey());
+  const open = FARD.filter((p) => !done.includes(p));
+  if (!open.length) return null;
+  const names = open.length === 1 ? open[0] : `${open.slice(0, -1).join(", ")} and ${open.at(-1)}`;
+  return { title: "Prayer tracker", text: `You haven't marked ${names} today.`, href: "#tracker", action: "Open tracker" };
+}
+
+const hijriDate = (date) => hijriFor(date.getFullYear(), date.getMonth() + 1, date.getDate());
+
+// Sunnah fasts coming up tomorrow: Monday and Thursday, the White Days (13–15),
+// Arafah, and Tasu'a and Ashura. Never during Ramadan, on Eid or the days of Tashreeq.
+function fastingNote() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const { day, month } = hijriDate(tomorrow);
+  if (month === 9 || (month === 10 && day === 1) || (month === 12 && day >= 10 && day <= 13)) return null;
+  const reasons = [];
+  if (month === 12 && day === 9) reasons.push("the Day of Arafah");
+  if (month === 1 && day === 9) reasons.push("Tasu'a, the day before Ashura");
+  if (month === 1 && day === 10) reasons.push("Ashura");
+  if (day >= 13 && day <= 15) reasons.push(`the ${day}th of the Hijri month, one of the White Days`);
+  const weekday = tomorrow.getDay();
+  if (weekday === 1 || weekday === 4) reasons.push(weekday === 1 ? "Monday" : "Thursday");
+  if (!reasons.length) return null;
+  return {
+    title: "Sunnah fast tomorrow",
+    text: `Tomorrow is ${reasons.join(" and ")}. Intend to fast and set an alarm for suhoor.`,
+    href: "calendar.html",
+    action: "Islamic calendar",
+  };
+}
+
+// After Isha and through the night: the sunnah of reciting Al-Mulk before sleep
+function mulkNote() {
+  if (!state.today) return null;
+  const now = nowSeconds();
+  if (now < toSeconds(state.today.timings.Isha) && now >= toSeconds(state.today.timings.Fajr)) return null;
+  return { title: "Before you sleep", text: "A sunnah of the night: recite Surah Al-Mulk before you sleep.", href: "quran.html?surah=67", action: "Read Al-Mulk" };
+}
+
+function renderNotes() {
+  const notes = [jummahNote(), fastingNote(), readingNote(), trackerNote(), mulkNote()].filter(Boolean);
+  $("today-notes").innerHTML = notes.map((n) => `
+    <a class="note card" href="${n.href}">
+      <span class="eyebrow">${escapeHtml(n.title)}</span>
+      <span class="note-text">${escapeHtml(n.text)}</span>
+      <span class="note-action">${escapeHtml(n.action)} →</span>
+    </a>`).join("");
 }
 
 // Part of the day, used to colour the sky behind the hero.
@@ -663,6 +1016,7 @@ function startCountdown() {
       renderTimes();
       renderTracker();
       renderArc();
+      renderNotes();
     } else {
       updateSun();
       updateWindow();
@@ -784,7 +1138,7 @@ async function loadVerseOfTheDay() {
   applyTranslationSetting($("verse"));
   try {
     const { data } = await getJSON(
-      `${QURAN_API}/ayah/${verseOfTheDayNumber()}/editions/${TEXT_EDITIONS},${reciter}`
+      `${QURAN_API}/ayah/${verseOfTheDayNumber()}/editions/${textEditions().slice(0, 3)},${reciter}`
     );
     const [ar, en, ur, audio] = data;
     const surah = ar.surah;
@@ -808,6 +1162,7 @@ async function loadVerseOfTheDay() {
     verseAudio.src = verse.audio;
     $("verse-play").disabled = false;
     $("verse-copy").disabled = false;
+    $("verse-share").disabled = false;
   } catch (err) {
     $("verse-ar").textContent = "";
     $("verse-en").textContent = `Couldn't load today's verse. ${err.message}`;
@@ -841,7 +1196,6 @@ async function copyVerse() {
 
 // ---------- Hadith of the day ----------
 
-const HADITH_API = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions";
 const HADITH_COLLECTIONS = [
   { id: "bukhari", name: "Sahih al-Bukhari" },
   { id: "muslim", name: "Sahih Muslim" },
@@ -850,7 +1204,7 @@ const HADITH_COUNT = 7563; // highest hadith number in both collections
 let hadith = null;
 
 const hadithText = async (lang, collection, n) => {
-  const json = await getJSON(`${HADITH_API}/${lang}-${collection}/${n}.json`);
+  const json = await getHadithJSON(`${lang}-${collection}/${n}`);
   return { text: json.hadiths?.[0]?.text?.trim() || "", hadith: json.hadiths?.[0], metadata: json.metadata };
 };
 
@@ -881,13 +1235,15 @@ async function loadHadithOfTheDay() {
       };
       $("hadith-ref").textContent = hadith.ref;
       $("hadith-book").textContent = hadith.section;
-      // The ﷺ ligature is very tall in most fonts; give it its own size.
-      $("hadith-en").innerHTML = escapeHtml(hadith.en).replace(/ﷺ/g, '<span class="honorific" lang="ar">ﷺ</span>');
+      const section = Object.keys(en.metadata.section || {})[0];
+      if (section) $("hadith-link").href = `hadith.html?c=${collection.id}&b=${section}#h-${n}`;
+      $("hadith-en").innerHTML = withHonorific(hadith.en);
       $("hadith-ur").textContent = hadith.ur;
       $("hadith-ar").textContent = hadith.ar;
       $("hadith-ar-wrap").hidden = false;
       $("hadith-ar-wrap").open = quranSettings().translation === "none";
       $("hadith-copy").disabled = false;
+      $("hadith-share").disabled = false;
       return;
     }
     throw new Error("Please try again later.");
@@ -1067,6 +1423,12 @@ $("prayer-banner-close").addEventListener("click", () => ($("prayer-banner").hid
 $("verse-play").addEventListener("click", toggleVerseAudio);
 $("verse-copy").addEventListener("click", copyVerse);
 $("hadith-copy").addEventListener("click", copyHadith);
+$("verse-share").addEventListener("click", () =>
+  shareCard({ label: "Verse of the day", ar: verse.ar, ...cardTranslation(verse.en, verse.ur), ref: `${verse.name} ${verse.surah}:${verse.ayah}` })
+    .catch((err) => toast(`Couldn't create the image. ${err.message}`)));
+$("hadith-share").addEventListener("click", () =>
+  shareCard({ label: "Hadith of the day", ar: hadith.ar, ...cardTranslation(hadith.en, hadith.ur), ref: hadith.ref.replace(" · ", ", ") })
+    .catch((err) => toast(`Couldn't create the image. ${err.message}`)));
 $("times").addEventListener("click", onPrayerToggle);
 $("tracker").addEventListener("click", onPrayerToggle);
 
@@ -1101,3 +1463,6 @@ for (const id of ["method", "school"]) {
     update(() => geocode(DEFAULT_CITY.city, DEFAULT_CITY.country));
   }
 })();
+
+renderNotes();
+renderQada();
