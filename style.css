@@ -955,6 +955,136 @@ body.has-player main { padding-bottom: 96px; }
   .month-nav { flex-wrap: wrap; }
 }
 
+/* =====================================================================
+   Install, prayer tracker, hadith, paras and khatam
+   ===================================================================== */
+
+.install-btn { white-space: nowrap; }
+
+/* Tick on each prayer in today's list */
+.pray-check {
+  position: absolute;
+  top: 20px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--muted) 60%, transparent);
+  border-radius: 50%;
+  color: transparent;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+.pray-check svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.pray-check:hover:not(:disabled) { border-color: var(--gold); color: color-mix(in srgb, var(--gold) 60%, transparent); }
+.pray-check.done { background: var(--gold); border-color: var(--gold); color: var(--bg); }
+.pray-check:disabled { opacity: 0.35; cursor: default; }
+
+/* Shared square toggle used by the tracker grid and khatam grid */
+.cell {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.cell:hover:not(:disabled) { border-color: var(--gold); }
+.cell.on { background: var(--gold); border-color: var(--gold); color: var(--bg); }
+.cell:disabled { opacity: 0.35; cursor: default; }
+
+.tracker { margin-top: 32px; padding: 32px 40px; }
+.tracker-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px; }
+.tracker-head h2 { margin-top: 4px; }
+.tracker-stats { display: flex; gap: 32px; margin: 0; }
+.tracker-stats dt { font-size: 12px; }
+.tracker-stats dd { margin: 2px 0 0; font-family: var(--mono); font-size: 20px; }
+.tracker-grid-wrap { overflow-x: auto; margin: 24px 0 12px; }
+.tracker-grid { width: 100%; border-collapse: separate; border-spacing: 6px; }
+.tracker-grid th { font-size: 12px; font-weight: 500; color: var(--muted); text-align: center; }
+.tracker-grid thead th span { display: block; font-family: var(--mono); color: var(--ink); }
+.tracker-grid thead th.today, .tracker-grid thead th.today span { color: var(--gold); }
+.tracker-grid tbody th { text-align: left; padding-right: 8px; white-space: nowrap; }
+.tracker-grid td { min-width: 34px; }
+.tracker-grid .cell { max-width: 44px; margin: 0 auto; }
+
+.hadith { margin-top: 32px; }
+.hadith-book { margin: 6px 0 0; }
+.hadith-text { margin: 18px 0 0; font-size: 17px; line-height: 1.75; }
+.honorific {
+  display: inline-block;
+  font-family: "Noto Naskh Arabic", serif;
+  font-size: 1.3em;
+  line-height: 1;
+  vertical-align: -0.15em;
+}
+.hadith-ar { margin-top: 18px; }
+.hadith-ar summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.hadith-ar p { margin: 12px 0 0; font-family: "Noto Naskh Arabic", serif; font-size: 20px; line-height: 2; text-align: right; }
+.hadith .verse-actions { margin-top: 16px; }
+
+.surahs .segmented { padding: 3px; }
+.surahs .segmented button { padding: 6px 16px; }
+.surah-card.is-done .surah-num { background: var(--gold); border-color: var(--gold); color: var(--bg); }
+
+.khatam { margin-bottom: 40px; padding: 28px 32px; }
+.khatam-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+.khatam-head h2 { margin-top: 4px; }
+.khatam-goal { font-size: 13px; color: var(--muted); }
+.khatam-goal select {
+  margin-left: 6px;
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  cursor: pointer;
+}
+.progress { height: 8px; margin-top: 18px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+.progress-bar { height: 100%; width: 0; background: var(--gold); border-radius: 999px; transition: width 0.4s; }
+.khatam-grid {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  gap: 6px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.khatam-done { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 16px; color: var(--gold); }
+.khatam-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-top: 20px; }
+.khatam-foot .outline-btn { margin: 0; text-decoration: none; }
+
+.surah-divider { margin: 40px 0 8px; padding: 20px 0 0; border-top: 1px solid var(--gold); text-align: center; }
+.surah-divider:first-child { margin-top: 24px; }
+.surah-divider-name { display: block; font-family: var(--serif); font-size: 28px; }
+.surah-divider .basmala { margin: 16px 0 0; }
+
+.juz-complete { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 32px; padding: 20px 24px; }
+.juz-complete p { margin: 0; }
+
+@media (max-width: 760px) {
+  .install-btn { margin-left: auto; }
+  .pray-check { position: static; }
+  .times li { grid-template-columns: 1fr auto auto; gap: 14px; }
+  .tracker { padding: 24px 18px; }
+  .tracker-stats { gap: 18px; flex-wrap: wrap; }
+  .tracker-grid { border-spacing: 4px; }
+  .tracker-grid td { min-width: 30px; }
+  .hadith .verse-head { flex-direction: column; gap: 4px; }
+  .khatam { padding: 22px 18px; }
+  .khatam-grid { grid-template-columns: repeat(10, 1fr); }
+}
+
 /* ---------- Print (monthly timetable) ---------- */
 
 @media print {

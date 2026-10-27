@@ -63,17 +63,53 @@ async function locate() {
   return place;
 }
 
-async function fetchDay(place, date) {
-  const params = new URLSearchParams({
+function timesParams(place) {
+  return new URLSearchParams({
     latitude: place.lat,
     longitude: place.lng,
     method: $("method").value,
     school: $("school").value,
     timezonestring: place.timezone,
   });
-  const json = await getJSON(`${ALADHAN_API}/timings/${date}?${params}`);
-  if (json.code !== 200) throw new Error(json.data || "Could not load prayer times.");
-  return json.data;
+}
+
+// Offline fallback: this month's and next month's times, saved once a day.
+const TIMES_CACHE_KEY = "times-cache";
+const timesCacheKey = (place) =>
+  `${place.lat.toFixed(3)},${place.lng.toFixed(3)},${$("method").value},${$("school").value}`;
+
+async function cacheMonths(place) {
+  const key = timesCacheKey(place);
+  const today = dateIn(place.timezone);
+  const cache = readStore(TIMES_CACHE_KEY, null);
+  if (cache?.key === key && cache.savedOn === today) return;
+  const [, month, year] = today.split("-").map(Number);
+  const months = [[year, month], month === 12 ? [year + 1, 1] : [year, month + 1]];
+  try {
+    const results = await Promise.all(
+      months.map(([y, m]) => getJSON(`${ALADHAN_API}/calendar/${y}/${m}?${timesParams(place)}`))
+    );
+    const days = {};
+    for (const { data } of results) {
+      for (const d of data) days[d.date.gregorian.date] = { timings: d.timings, date: d.date };
+    }
+    writeStore(TIMES_CACHE_KEY, { key, savedOn: today, days });
+  } catch {
+    // Best effort; the live API still works while online.
+  }
+}
+
+async function fetchDay(place, date) {
+  try {
+    const json = await getJSON(`${ALADHAN_API}/timings/${date}?${timesParams(place)}`);
+    if (json.code !== 200) throw new Error(json.data || "Could not load prayer times.");
+    return json.data;
+  } catch (err) {
+    const cache = readStore(TIMES_CACHE_KEY, null);
+    const saved = cache?.key === timesCacheKey(place) && cache.days[date];
+    if (saved) return saved;
+    throw err;
+  }
 }
 
 // Resolve a place, then load today's and tomorrow's times for it.
@@ -99,8 +135,10 @@ async function update(getPlace) {
 
     renderHeader();
     renderTimes();
+    renderTracker();
     renderQibla();
     startCountdown();
+    cacheMonths(place);
   } catch (err) {
     if (id === requestId) showError(err.message);
   } finally {
@@ -178,22 +216,113 @@ function renderHeader() {
   }
 }
 
+const CHECK_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>`;
+
 function renderTimes() {
   const now = nowSeconds();
   const next = nextPrayer();
+  const prayed = prayedOn(localDateKey());
   $("times").innerHTML = PRAYERS.map((name) => {
     const time = state.today.timings[name];
     const [clock, suffix] = to12h(time);
+    const started = toSeconds(time) <= now;
     const isNext = !next.tomorrow && name === next.name;
     const classes = [
       name === "Sunrise" && "sunrise",
-      isNext ? "next" : toSeconds(time) <= now && "passed",
+      isNext ? "next" : started && "passed",
     ].filter(Boolean).join(" ");
+    const done = prayed.includes(name);
+    const check = name === "Sunrise" ? "" : `
+      <button class="pray-check${done ? " done" : ""}" data-prayer="${name}" type="button"
+        aria-pressed="${done}" aria-label="Mark ${name} as prayed" ${started || done ? "" : "disabled"}
+        title="${started || done ? `Mark ${name} as prayed` : `${name} hasn't started yet`}">${CHECK_ICON}</button>`;
     return `<li class="${classes}">
       <div><span class="name">${name}</span><span class="arabic" lang="ar">${ARABIC[name]}</span></div>
       <span class="time">${clock}<small>${suffix}</small></span>
+      ${check}
     </li>`;
   }).join("");
+}
+
+// ---------- Prayer tracker ----------
+
+const PRAYER_LOG_KEY = "prayer-log"; // { "YYYY-MM-DD": ["Fajr", "Dhuhr", ...] }
+const FARD = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
+
+const prayerLog = () => readStore(PRAYER_LOG_KEY, {}) || {};
+const prayedOn = (dateKey) => prayerLog()[dateKey] || [];
+
+function togglePrayed(dateKey, name) {
+  const log = prayerLog();
+  const set = new Set(log[dateKey] || []);
+  if (set.has(name)) set.delete(name);
+  else set.add(name);
+  if (set.size) log[dateKey] = FARD.filter((p) => set.has(p));
+  else delete log[dateKey];
+  writeStore(PRAYER_LOG_KEY, log);
+}
+
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d;
+}
+
+function renderTracker() {
+  const log = prayerLog();
+  const done = (key) => log[key] || [];
+  const todayKey = localDateKey();
+  $("tracker-today").textContent = `${done(todayKey).length} of 5 today`;
+
+  // Days in a row with all five, counting today only once it's complete
+  let streak = 0;
+  for (let i = done(todayKey).length === 5 ? 0 : 1; i < 3650; i++) {
+    if (done(localDateKey(daysAgo(i))).length !== 5) break;
+    streak++;
+  }
+  $("tracker-streak").textContent = `${streak} day${streak === 1 ? "" : "s"}`;
+
+  const week = Array.from({ length: 7 }, (_, i) => daysAgo(6 - i));
+  const weekTotal = week.reduce((sum, d) => sum + done(localDateKey(d)).length, 0);
+  $("tracker-week").textContent = `${weekTotal} / 35`;
+
+  // Unmarked prayers on past days since tracking began (at most 30 days back)
+  const firstDay = Object.keys(log).sort()[0];
+  let missed = 0;
+  for (let i = 1; firstDay && i <= 30; i++) {
+    const key = localDateKey(daysAgo(i));
+    if (key < firstDay) break;
+    missed += 5 - done(key).length;
+  }
+  $("tracker-missed").textContent = missed;
+
+  $("tracker-days").innerHTML = `<th></th>` + week.map((d) => {
+    const isToday = localDateKey(d) === todayKey;
+    return `<th scope="col" class="${isToday ? "today" : ""}">
+      ${d.toLocaleDateString("en-GB", { weekday: "short" })}<span>${d.getDate()}</span>
+    </th>`;
+  }).join("");
+
+  const now = state.place ? nowSeconds() : Infinity;
+  $("tracker-body").innerHTML = FARD.map((p) => `<tr>
+    <th scope="row">${p}</th>
+    ${week.map((d) => {
+      const key = localDateKey(d);
+      const on = done(key).includes(p);
+      const notYet = key === todayKey && !on && state.today && toSeconds(state.today.timings[p]) > now;
+      const label = `${p} on ${d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}`;
+      return `<td><button class="cell${on ? " on" : ""}" type="button" data-prayer="${p}" data-date="${key}"
+        aria-pressed="${on}" aria-label="${label}" title="${label}" ${notYet ? "disabled" : ""}></button></td>`;
+    }).join("")}
+  </tr>`).join("");
+}
+
+function onPrayerToggle(e) {
+  const btn = e.target.closest("button[data-prayer]");
+  if (!btn) return;
+  togglePrayed(btn.dataset.date || localDateKey(), btn.dataset.prayer);
+  if (state.today) renderTimes();
+  renderTracker();
 }
 
 // Part of the day, used to colour the sky behind the hero.
@@ -289,6 +418,7 @@ function startCountdown() {
       $("next-name").textContent = next.name;
       $("next-time").textContent = `at ${to12h(next.time).join(" ")}${next.tomorrow ? " tomorrow" : ""}`;
       renderTimes();
+      renderTracker();
       renderArc();
     } else {
       updateSun();
@@ -396,9 +526,7 @@ const verseAudio = new Audio();
 // Same verse for everyone on a given day; stepping by a number coprime
 // with 6236 visits every verse before repeating.
 function verseOfTheDayNumber() {
-  const now = new Date();
-  const day = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
-  return ((day * 2621) % TOTAL_AYAHS) + 1;
+  return ((localDayNumber() * 2621) % TOTAL_AYAHS) + 1;
 }
 
 function applyTranslationSetting(root) {
@@ -465,6 +593,74 @@ async function copyVerse() {
   parts.push(`— Quran ${verse.surah}:${verse.ayah} (${verse.name})`);
   await copyText(parts.join("\n\n"));
   toast("Verse copied.");
+}
+
+// ---------- Hadith of the day ----------
+
+const HADITH_API = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions";
+const HADITH_COLLECTIONS = [
+  { id: "bukhari", name: "Sahih al-Bukhari" },
+  { id: "muslim", name: "Sahih Muslim" },
+];
+const HADITH_COUNT = 7563; // highest hadith number in both collections
+let hadith = null;
+
+const hadithText = async (lang, collection, n) => {
+  const json = await getJSON(`${HADITH_API}/${lang}-${collection}/${n}.json`);
+  return { text: json.hadiths?.[0]?.text?.trim() || "", hadith: json.hadiths?.[0], metadata: json.metadata };
+};
+
+// Alternates Bukhari and Muslim by day. Starting from the day's number, takes the
+// first hadith that has Arabic, English and Urdu text and is short enough to read.
+async function loadHadithOfTheDay() {
+  applyTranslationSetting($("hadith"));
+  const day = localDayNumber();
+  const collection = HADITH_COLLECTIONS[day % 2];
+  let n = ((day * 3571) % HADITH_COUNT) + 1;
+  try {
+    for (let tries = 0; tries < 20; tries++, n = (n % HADITH_COUNT) + 1) {
+      const en = await hadithText("eng", collection.id, n).catch((err) => {
+        if (err.status === 404) return null;
+        throw err;
+      });
+      if (!en?.text || en.text.length > 700 || en.text.includes("??")) continue;
+      const [ur, ar] = await Promise.all([hadithText("urd", collection.id, n), hadithText("ara", collection.id, n)]);
+      if (!ur.text || !ar.text) continue;
+
+      const { book, hadith: inBook } = en.hadith.reference;
+      hadith = {
+        ref: `${collection.name} · Book ${book}, Hadith ${inBook}`,
+        section: Object.values(en.metadata.section || {})[0] || "",
+        en: en.text,
+        ur: ur.text,
+        ar: ar.text,
+      };
+      $("hadith-ref").textContent = hadith.ref;
+      $("hadith-book").textContent = hadith.section;
+      // The ﷺ ligature is very tall in most fonts; give it its own size.
+      $("hadith-en").innerHTML = escapeHtml(hadith.en).replace(/ﷺ/g, '<span class="honorific" lang="ar">ﷺ</span>');
+      $("hadith-ur").textContent = hadith.ur;
+      $("hadith-ar").textContent = hadith.ar;
+      $("hadith-ar-wrap").hidden = false;
+      $("hadith-ar-wrap").open = quranSettings().translation === "none";
+      $("hadith-copy").disabled = false;
+      return;
+    }
+    throw new Error("Please try again later.");
+  } catch (err) {
+    $("hadith-en").textContent = `Couldn't load today's hadith. ${err.message}`;
+  }
+}
+
+async function copyHadith() {
+  const { translation } = quranSettings();
+  const parts = [];
+  if (translation === "en" || translation === "both") parts.push(hadith.en);
+  if (translation === "ur" || translation === "both") parts.push(hadith.ur);
+  if (translation === "none") parts.push(hadith.ar);
+  parts.push(`— ${hadith.ref}`);
+  await copyText(parts.join("\n\n"));
+  toast("Hadith copied.");
 }
 
 // ---------- Qibla ----------
@@ -602,6 +798,9 @@ $("alerts-test").addEventListener("click", () => {
 $("prayer-banner-close").addEventListener("click", () => ($("prayer-banner").hidden = true));
 $("verse-play").addEventListener("click", toggleVerseAudio);
 $("verse-copy").addEventListener("click", copyVerse);
+$("hadith-copy").addEventListener("click", copyHadith);
+$("times").addEventListener("click", onPrayerToggle);
+$("tracker").addEventListener("click", onPrayerToggle);
 
 for (const id of ["method", "school"]) {
   $(id).addEventListener("change", () => {
@@ -615,7 +814,9 @@ for (const id of ["method", "school"]) {
 (function init() {
   drawDial();
   renderAlertsButton();
+  renderTracker();
   loadVerseOfTheDay();
+  loadHadithOfTheDay();
 
   const saved = loadSettings();
   if (saved.method) $("method").value = saved.method;

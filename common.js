@@ -145,6 +145,18 @@ function dateIn(timeZone, addDays = 0) {
   return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()}`;
 }
 
+// The device's local date as "YYYY-MM-DD" (for trackers and streaks)
+function localDateKey(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// Whole days since 1970 for the device's local date; drives the "of the day" picks
+function localDayNumber() {
+  const now = new Date();
+  return Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
+}
+
 // "05:12" or "05:12 (PKT)" -> seconds since midnight
 function toSeconds(time) {
   const [h, m] = time.split(" ")[0].split(":").map(Number);
@@ -231,3 +243,45 @@ renderThemeButton();
 for (const link of document.querySelectorAll(".nav a")) {
   if (link.dataset.page === document.body.dataset.page) link.setAttribute("aria-current", "page");
 }
+
+// ---------- Installable app & offline ----------
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {
+    // Not fatal: the site still works, just without offline support.
+  });
+}
+
+const isStandalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let installPrompt = null;
+
+// Chrome, Edge and Android offer a real install prompt; iOS needs Share → Add to Home Screen.
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  $("install-btn").hidden = false;
+});
+
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  $("install-btn").hidden = true;
+  toast("Salah is installed. Open it from your home screen or app list.");
+});
+
+if (isIOS && !isStandalone) $("install-btn").hidden = false;
+
+$("install-btn").addEventListener("click", async () => {
+  if (installPrompt) {
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") $("install-btn").hidden = true;
+    installPrompt = null;
+  } else if (isIOS) {
+    toast("To install: tap the Share button, then “Add to Home Screen”.", 6000);
+  }
+});
+
+window.addEventListener("offline", () => toast("You're offline. Saved pages and data still work.", 4000));
+window.addEventListener("online", () => toast("Back online.", 2000));
