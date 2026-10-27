@@ -1,0 +1,58 @@
+# Tilawave is a static site with no build step: everything it needs is committed.
+# These rules keep secrets, local tooling and machine clutter out of the repository.
+
+# Secrets and credentials (the app needs none; never commit any)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+*.keystore
+credentials*.json
+secrets*.json
+*.secret
+
+# Dependencies and build output (none today; ignored in case tooling is added later)
+node_modules/
+.venv/
+venv/
+__pycache__/
+dist/
+build/
+.cache/
+.parcel-cache/
+coverage/
+
+# Logs, test artifacts and temporary files
+*.log
+npm-debug.log*
+*.tmp
+*.tmp.*
+*.swp
+*~
+tests/**/*.png
+tests/artifacts/
+
+# Local databases and backups (including Tilawave data exports)
+*.sqlite
+*.sqlite3
+*.db
+*.bak
+tilawave-backup-*.json
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local notes for the AI coding assistant (kept on this machine only)
+CLAUDE.md
+.claude/
