@@ -1,6 +1,14 @@
 const API = "https://api.aladhan.com/v1";
 const GEOCODE_API = "https://geocoding-api.open-meteo.com/v1/search";
 const PRAYERS = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
+const ARABIC = {
+  Fajr: "الفجر",
+  Sunrise: "الشروق",
+  Dhuhr: "الظهر",
+  Asr: "العصر",
+  Maghrib: "المغرب",
+  Isha: "العشاء",
+};
 const KAABA = { lat: 21.4225, lng: 39.8262 };
 const STORAGE_KEY = "prayer-times-settings";
 
@@ -51,7 +59,7 @@ async function fetchTimings(query) {
   const school = $("school").value;
 
   showError("");
-  $("location").textContent = "Loading…";
+  $("location").textContent = "Loading";
 
   try {
     const place = "lat" in query ? query : await geocode(query.city, query.country);
@@ -66,10 +74,10 @@ async function fetchTimings(query) {
     state.timezone = meta.timezone;
     state.qibla = qiblaDirection(place.lat, place.lng);
 
-    $("location").textContent =
-      `📍 ${place.label || `${place.lat.toFixed(3)}, ${place.lng.toFixed(3)}`}`;
-    $("dates").textContent =
-      `${date.readable} · ${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH`;
+    $("location").textContent = place.label || "Your location";
+    $("dates").innerHTML =
+      `${date.gregorian.weekday.en}, ${date.readable}` +
+      `<span class="hijri">${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH</span>`;
 
     renderTimes();
     renderQibla();
@@ -106,10 +114,10 @@ function nowSeconds() {
   return get("hour") * 3600 + get("minute") * 60 + get("second");
 }
 
+// "15:41" -> ["3:41", "PM"]
 function to12h(time) {
   const [h, m] = time.split(" ")[0].split(":").map(Number);
-  const suffix = h >= 12 ? "PM" : "AM";
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${suffix}`;
+  return [`${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")}`, h >= 12 ? "PM" : "AM"];
 }
 
 function formatDuration(sec) {
@@ -137,8 +145,15 @@ function renderTimes() {
   const next = nextPrayer().name;
   $("times").innerHTML = PRAYERS.map((name) => {
     const time = state.timings[name];
-    const cls = name === next ? "next" : toSeconds(time) <= now ? "passed" : "";
-    return `<li class="${cls}"><span>${name}</span><span class="time">${to12h(time)}</span></li>`;
+    const [clock, suffix] = to12h(time);
+    const classes = [
+      name === "Sunrise" && "sunrise",
+      name === next ? "next" : toSeconds(time) <= now && "passed",
+    ].filter(Boolean).join(" ");
+    return `<li class="${classes}">
+      <div><span class="name">${name}</span><span class="arabic" lang="ar">${ARABIC[name]}</span></div>
+      <span class="time">${clock}<small>${suffix}</small></span>
+    </li>`;
   }).join("");
 }
 
@@ -147,10 +162,11 @@ function startCountdown() {
   let lastNext = null;
   const tick = () => {
     const { name, remaining } = nextPrayer();
-    $("next-name").textContent = name;
     $("countdown").textContent = formatDuration(remaining);
     if (name !== lastNext) {
       lastNext = name;
+      $("next-name").textContent = name;
+      $("next-time").textContent = `at ${to12h(state.timings[name]).join(" ")}`;
       renderTimes();
     }
   };
@@ -171,12 +187,24 @@ function qiblaDirection(lat, lng) {
   return (Math.atan2(y, x) / rad + 360) % 360;
 }
 
+function drawTicks() {
+  const ticks = [];
+  for (let deg = 0; deg < 360; deg += 5) {
+    const major = deg % 30 === 0;
+    const inner = major ? 84 : 89;
+    ticks.push(
+      `<line class="tick${major ? " major" : ""}" y1="-${inner}" y2="-94" transform="rotate(${deg})" />`
+    );
+  }
+  $("ticks").innerHTML = ticks.join("");
+}
+
 function renderQibla(heading = 0) {
   if (state.qibla == null) return;
   $("qibla-deg").textContent = `${state.qibla.toFixed(1)}°`;
-  // Rotate the dial opposite to the phone's heading so "N" stays pointing north.
-  document.querySelector(".compass").style.transform = `rotate(${-heading}deg)`;
-  $("needle").style.transform = `rotate(${state.qibla}deg)`;
+  // Rotate the dial opposite to the phone's heading so N stays pointing north.
+  $("dial").setAttribute("transform", `rotate(${-heading})`);
+  $("needle").setAttribute("transform", `rotate(${state.qibla})`);
 }
 
 function handleOrientation(e) {
@@ -203,9 +231,9 @@ async function enableCompass() {
     } else {
       throw new Error("not supported");
     }
-    $("compass-note").textContent = "Live compass on. Turn until the 🕋 points straight up.";
+    $("compass-note").textContent = "Live compass on. Turn until the marker reaches the top.";
   } catch (err) {
-    $("compass-note").textContent = `Compass unavailable (${err.message}). Use the degrees shown above.`;
+    $("compass-note").textContent = `Compass unavailable (${err.message}). Use the bearing above.`;
   }
 }
 
@@ -213,7 +241,7 @@ async function enableCompass() {
 
 function useGps() {
   if (!navigator.geolocation) return showError("Geolocation is not supported by this browser.");
-  $("location").textContent = "Getting your location…";
+  $("location").textContent = "Locating";
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
       const query = { lat: coords.latitude, lng: coords.longitude };
@@ -241,13 +269,15 @@ for (const id of ["method", "school"]) {
   $(id).addEventListener("change", () => {
     saveSettings({ [id]: $(id).value });
     const { query } = loadSettings();
-    if (query) fetchTimings(query);
+    fetchTimings(query || { city: $("city").value, country: $("country").value });
   });
 }
 
 // ---------- Start ----------
 
 (function init() {
+  drawTicks();
+
   const saved = loadSettings();
   if (saved.method) $("method").value = saved.method;
   if (saved.school) $("school").value = saved.school;

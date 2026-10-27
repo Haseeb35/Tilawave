@@ -3,77 +3,98 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Prayer Times & Qibla</title>
+  <title>Salah — Prayer Times & Qibla</title>
   <meta name="description" content="Today's prayer times for your city and the Qibla direction.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Noto+Naskh+Arabic:wght@400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>🕌 Prayer Times & Qibla</h1>
-    <p id="dates" class="muted">Loading date…</p>
+  <header class="topbar">
+    <a class="brand" href="./">Salah</a>
+    <form id="city-form" class="search">
+      <input id="city" type="text" placeholder="City" aria-label="City" required>
+      <input id="country" type="text" placeholder="Country" aria-label="Country" required>
+      <button type="submit">Search</button>
+    </form>
+    <button id="gps-btn" class="text-btn" type="button">Use my location</button>
   </header>
 
   <main>
-    <!-- Location -->
-    <section class="card">
-      <form id="city-form" class="location-form">
-        <input id="city" type="text" placeholder="City (e.g. Lahore)" required>
-        <input id="country" type="text" placeholder="Country (e.g. Pakistan)" required>
-        <button type="submit">Search</button>
-      </form>
-      <button id="gps-btn" class="secondary">📍 Use my location</button>
-      <details class="settings">
-        <summary>Settings</summary>
-        <label>Calculation method
-          <select id="method">
-            <option value="1">University of Islamic Sciences, Karachi</option>
-            <option value="2">ISNA (North America)</option>
-            <option value="3">Muslim World League</option>
-            <option value="4">Umm Al-Qura, Makkah</option>
-            <option value="5">Egyptian General Authority</option>
-            <option value="8">Gulf Region</option>
-            <option value="16">Dubai</option>
-          </select>
-        </label>
-        <label>Asr school
-          <select id="school">
-            <option value="1">Hanafi</option>
-            <option value="0">Shafi'i / Maliki / Hanbali</option>
-          </select>
-        </label>
-      </details>
-      <p id="location" class="muted"></p>
-      <p id="error" class="error" hidden></p>
-    </section>
-
-    <!-- Next prayer -->
-    <section class="card highlight">
-      <p class="muted">Next prayer</p>
-      <h2 id="next-name">—</h2>
-      <p id="countdown" class="countdown">--:--:--</p>
-    </section>
-
-    <!-- Times -->
-    <section class="card">
-      <h3>Today's times</h3>
-      <ul id="times" class="times"></ul>
-    </section>
-
-    <!-- Qibla -->
-    <section class="card qibla">
-      <h3>Qibla direction</h3>
-      <div class="compass">
-        <span class="n">N</span>
-        <div id="needle" class="needle">🕋</div>
+    <section class="hero">
+      <div class="hero-meta">
+        <p id="location" class="eyebrow">Loading</p>
+        <p id="dates" class="dates"></p>
       </div>
-      <p><strong id="qibla-deg">—</strong> from North</p>
-      <button id="compass-btn" class="secondary">🧭 Enable live compass</button>
-      <p id="compass-note" class="muted small">On a phone, turn on the compass and hold the device flat.</p>
+      <div class="hero-next">
+        <p class="eyebrow">Next prayer</p>
+        <h1 id="next-name">&nbsp;</h1>
+        <p class="countdown">
+          <span id="countdown">--:--:--</span>
+          <span id="next-time" class="muted"></span>
+        </p>
+      </div>
+    </section>
+
+    <p id="error" class="error" hidden></p>
+
+    <section class="schedule">
+      <div class="section-head">
+        <h2>Today</h2>
+        <div class="settings">
+          <label>Method
+            <select id="method">
+              <option value="1">Karachi</option>
+              <option value="2">ISNA</option>
+              <option value="3">Muslim World League</option>
+              <option value="4">Umm Al-Qura</option>
+              <option value="5">Egyptian</option>
+              <option value="8">Gulf Region</option>
+              <option value="16">Dubai</option>
+            </select>
+          </label>
+          <label>Asr
+            <select id="school">
+              <option value="1">Hanafi</option>
+              <option value="0">Standard</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <ol id="times" class="times"></ol>
+    </section>
+
+    <section class="qibla">
+      <div class="qibla-text">
+        <h2>Qibla</h2>
+        <p class="bearing"><span id="qibla-deg">—</span></p>
+        <p class="muted">Bearing from true north toward the Kaaba in Makkah.</p>
+        <button id="compass-btn" class="outline-btn" type="button">Enable live compass</button>
+        <p id="compass-note" class="muted small">On a phone, hold the device flat and turn until the marker reaches the top.</p>
+      </div>
+      <svg class="compass" viewBox="-110 -110 220 220" role="img" aria-label="Qibla compass">
+        <path class="pointer" d="M0 -108 L5 -100 L-5 -100 Z" />
+        <g id="dial">
+          <circle class="ring" r="96" />
+          <g id="ticks"></g>
+          <text class="cardinal north" y="-70">N</text>
+          <text class="cardinal" x="72" y="4">E</text>
+          <text class="cardinal" y="78">S</text>
+          <text class="cardinal" x="-72" y="4">W</text>
+          <g id="needle">
+            <line class="needle-line" y1="0" y2="-80" />
+            <rect class="kaaba" x="-6" y="-94" width="12" height="12" />
+          </g>
+          <circle class="hub" r="3.5" />
+        </g>
+      </svg>
     </section>
   </main>
 
-  <footer class="muted small">
-    Times from the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener">Aladhan API</a>
+  <footer>
+    <span>Times by <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener">Aladhan</a></span>
+    <span>Geocoding by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a></span>
   </footer>
 
   <script src="app.js"></script>
