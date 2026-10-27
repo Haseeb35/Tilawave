@@ -467,7 +467,38 @@ async function toggleCompass() {
   }, 3000);
 }
 
+// ---------- Theme ----------
+
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+
+// The user's choice if they made one, otherwise the system setting
+function currentTheme() {
+  return document.documentElement.dataset.theme || (darkQuery.matches ? "dark" : "light");
+}
+
+function renderThemeButton() {
+  const dark = currentTheme() === "dark";
+  const label = dark ? "Switch to light mode" : "Switch to dark mode";
+  $("theme-btn").classList.toggle("is-dark", dark);
+  $("theme-btn").setAttribute("aria-label", label);
+  $("theme-btn").title = label;
+}
+
+function toggleTheme() {
+  const theme = currentTheme() === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = theme;
+  try {
+    localStorage.setItem("theme", theme);
+  } catch {
+    // Storage may be blocked; the theme still applies for this visit.
+  }
+  renderThemeButton();
+}
+
 // ---------- Events ----------
+
+$("theme-btn").addEventListener("click", toggleTheme);
+darkQuery.addEventListener("change", renderThemeButton);
 
 $("city-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -490,6 +521,7 @@ for (const id of ["method", "school"]) {
 
 (function init() {
   drawTicks();
+  renderThemeButton();
 
   const saved = loadSettings();
   if (saved.method) $("method").value = saved.method;

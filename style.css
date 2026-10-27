@@ -17,8 +17,12 @@
   --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1'%3E%3Crect x='18' y='18' width='36' height='36'/%3E%3Crect x='18' y='18' width='36' height='36' transform='rotate(45 36 36)'/%3E%3Ccircle cx='36' cy='36' r='9'/%3E%3Cpath d='M0 0L13 13M72 0L59 13M0 72L13 59M72 72L59 59'/%3E%3C/g%3E%3C/svg%3E");
 }
 
+:root { color-scheme: light; }
+
+/* Dark theme: follows the system unless the user picked light, or picked dark explicitly */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #0d1020;
     --surface: #151a2e;
     --ink: #f1ede1;
@@ -29,6 +33,18 @@
     --error: #f0a08c;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 16px 40px -16px rgba(0, 0, 0, 0.5);
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1020;
+  --surface: #151a2e;
+  --ink: #f1ede1;
+  --muted: #a3a6b8;
+  --line: #262c45;
+  --accent: #d9b36c;
+  --gold: #d9b36c;
+  --error: #f0a08c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 16px 40px -16px rgba(0, 0, 0, 0.5);
 }
 
 * { box-sizing: border-box; }
@@ -41,6 +57,7 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .topbar, main, footer {
@@ -126,6 +143,33 @@ input, select, button { font: inherit; color: inherit; }
   text-underline-offset: 3px;
 }
 .text-btn:hover { color: var(--ink); }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.icon-btn:hover { border-color: var(--gold); }
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-btn .icon-sun,
+.icon-btn.is-dark .icon-moon { display: none; }
+.icon-btn.is-dark .icon-sun { display: block; }
 
 button:disabled { opacity: 0.5; cursor: default; }
 
