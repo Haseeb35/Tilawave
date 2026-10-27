@@ -266,6 +266,79 @@ function renderTimes() {
   }).join("");
 }
 
+// Part of the day, used to colour the sky behind the hero.
+function currentPeriod() {
+  const now = nowSeconds();
+  const at = (name) => toSeconds(state.today.timings[name]);
+  if (now < at("Fajr") || now >= at("Isha")) return "night";
+  if (now < at("Sunrise")) return "dawn";
+  if (now < at("Dhuhr")) return "morning";
+  if (now < at("Asr")) return "afternoon";
+  if (now < at("Maghrib")) return "evening";
+  return "dusk";
+}
+
+// ---------- Sun path (Fajr → Isha arc) ----------
+
+const ARC = { x0: 40, x1: 960, base: 170, height: 140 };
+
+function arcPoint(t) {
+  return [ARC.x0 + (ARC.x1 - ARC.x0) * t, ARC.base - ARC.height * Math.sin(Math.PI * t)];
+}
+
+function arcPath(t0, t1) {
+  const steps = Math.max(2, Math.ceil((t1 - t0) * 80));
+  let d = "";
+  for (let i = 0; i <= steps; i++) {
+    const [x, y] = arcPoint(t0 + ((t1 - t0) * i) / steps);
+    d += `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+  }
+  return d;
+}
+
+// Position of a time of day along the arc, 0 (Fajr) to 1 (Isha)
+function arcT(seconds) {
+  const start = toSeconds(state.today.timings.Fajr);
+  const end = toSeconds(state.today.timings.Isha);
+  return Math.min(1, Math.max(0, (seconds - start) / (end - start)));
+}
+
+function renderArc() {
+  const now = nowSeconds();
+  const next = nextPrayer();
+  const markers = PRAYERS.map((name) => {
+    const s = toSeconds(state.today.timings[name]);
+    const [x, y] = arcPoint(arcT(s));
+    const cls = !next.tomorrow && name === next.name ? "next" : s <= now ? "passed" : "";
+    return `<g class="marker ${cls}">
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" />
+      <text x="${x.toFixed(1)}" y="${ARC.base + 30}">${name}</text>
+    </g>`;
+  }).join("");
+  $("arc").innerHTML = `
+    <defs>
+      <radialGradient id="sun-glow">
+        <stop offset="0" stop-color="#ffe6ad" stop-opacity="0.9" />
+        <stop offset="1" stop-color="#ffe6ad" stop-opacity="0" />
+      </radialGradient>
+    </defs>
+    <line class="horizon" x1="0" x2="1000" y1="${ARC.base}" y2="${ARC.base}" />
+    <path class="arc-track" d="${arcPath(0, 1)}" />
+    <path id="arc-done" class="arc-done" />
+    ${markers}
+    <g id="sun"><circle r="28" fill="url(#sun-glow)" /><circle class="sun-core" r="8" /></g>`;
+  updateSun();
+}
+
+function updateSun() {
+  const now = nowSeconds();
+  const t = arcT(now);
+  const [x, y] = arcPoint(t);
+  $("arc-done").setAttribute("d", t > 0 ? arcPath(0, t) : "");
+  $("sun").setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+  $("sun").classList.toggle("resting", currentPeriod() === "night");
+}
+
 function startCountdown() {
   clearInterval(countdownTimer);
   let lastNext = null;
@@ -278,12 +351,16 @@ function startCountdown() {
     }
     const next = nextPrayer();
     $("countdown").textContent = formatDuration(next.remaining);
+    $("hero").dataset.period = currentPeriod();
     const key = `${next.name}-${next.tomorrow}`;
     if (key !== lastNext) {
       lastNext = key;
       $("next-name").textContent = next.name;
       $("next-time").textContent = `at ${to12h(next.time).join(" ")}${next.tomorrow ? " tomorrow" : ""}`;
       renderTimes();
+      renderArc();
+    } else {
+      updateSun();
     }
   };
   tick();

@@ -23,19 +23,22 @@
   </header>
 
   <main>
-    <section class="hero">
-      <div class="hero-meta">
-        <p id="location" class="eyebrow">Loading</p>
-        <p id="dates" class="dates"></p>
+    <section id="hero" class="hero" data-period="night">
+      <div class="hero-top">
+        <div class="hero-meta">
+          <p id="location" class="eyebrow">Loading</p>
+          <p id="dates" class="dates"></p>
+        </div>
+        <div class="hero-next">
+          <p class="eyebrow">Next prayer</p>
+          <h1 id="next-name">&nbsp;</h1>
+          <p class="countdown">
+            <span id="countdown">--:--:--</span>
+            <span id="next-time" class="muted"></span>
+          </p>
+        </div>
       </div>
-      <div class="hero-next">
-        <p class="eyebrow">Next prayer</p>
-        <h1 id="next-name">&nbsp;</h1>
-        <p class="countdown">
-          <span id="countdown">--:--:--</span>
-          <span id="next-time" class="muted"></span>
-        </p>
-      </div>
+      <svg id="arc" class="arc" viewBox="0 0 1000 210" aria-hidden="true"></svg>
     </section>
 
     <p id="error" class="error" hidden></p>
@@ -63,10 +66,10 @@
           </label>
         </div>
       </div>
-      <ol id="times" class="times"></ol>
+      <ol id="times" class="times card"></ol>
     </section>
 
-    <section class="qibla">
+    <section class="qibla card">
       <div class="qibla-text">
         <h2>Qibla</h2>
         <p class="bearing"><span id="qibla-deg">—</span></p>
