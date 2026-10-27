@@ -218,30 +218,115 @@ function renderHeader() {
 
 const CHECK_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>`;
 
+// Small line icons showing where the sun is at each prayer
+const SKY_ICONS = {
+  Fajr: `<path d="M3 17h18" /><path d="M8.5 17a3.5 3.5 0 0 1 7 0" /><path d="M12 9.5v2M7.3 12.2l1.2 1.1M16.7 12.2l-1.2 1.1" class="rays" />`,
+  Sunrise: `<path d="M3 17h18" /><path d="M7 17a5 5 0 0 1 10 0" /><path d="M12 3.5v5M9.8 5.7 12 3.5l2.2 2.2" class="lift" />`,
+  Dhuhr: `<circle cx="12" cy="12" r="3.6" /><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6" class="rays" />`,
+  Asr: `<path d="M3 19h18" /><circle cx="16" cy="8" r="3" /><path d="M7 19v-6" /><path d="M7 19l5.5-2.2" class="shadow" />`,
+  Maghrib: `<path d="M3 17h18" /><path d="M7 17a5 5 0 0 1 10 0" /><path d="M12 3.5v5M9.8 6.3 12 8.5l2.2-2.2" class="sink" />`,
+  Isha: `<path d="M14.5 4.5a7.5 7.5 0 1 0 5 12.6A6 6 0 0 1 14.5 4.5z" /><path d="M18.5 3.5l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z" class="twinkle" />`,
+};
+
+// Fard rak'ahs, which every school agrees on
+const PRAYER_FACTS = {
+  Fajr: "2 rak'ahs fard",
+  Dhuhr: "4 rak'ahs fard",
+  Asr: "4 rak'ahs fard",
+  Maghrib: "3 rak'ahs fard",
+  Isha: "4 rak'ahs fard, then Witr",
+};
+const WINDOW_END = { Fajr: "Sunrise", Dhuhr: "Asr", Asr: "Maghrib", Maghrib: "Isha", Isha: "Fajr" };
+
+// When a prayer's time ends (Isha runs until tomorrow's Fajr)
+function windowEnd(name) {
+  if (name === "Isha") return toSeconds(state.tomorrow.timings.Fajr) + DAY;
+  return toSeconds(state.today.timings[WINDOW_END[name]]);
+}
+
+// The prayer whose time we are in right now, if any (none between sunrise and Dhuhr)
+function currentWindow() {
+  const now = nowSeconds();
+  for (const name of [...FARD].reverse()) {
+    const start = toSeconds(state.today.timings[name]);
+    if (now < start) continue;
+    const end = windowEnd(name);
+    return now < end ? { name, start, end, now } : null;
+  }
+  return null;
+}
+
+let renderedWindow = null;
+
 function renderTimes() {
   const now = nowSeconds();
   const next = nextPrayer();
+  const current = currentWindow();
+  renderedWindow = current?.name ?? null;
   const prayed = prayedOn(localDateKey());
+
   $("times").innerHTML = PRAYERS.map((name) => {
     const time = state.today.timings[name];
     const [clock, suffix] = to12h(time);
     const started = toSeconds(time) <= now;
     const isNext = !next.tomorrow && name === next.name;
+    const isNow = current?.name === name;
     const classes = [
+      "prayer",
       name === "Sunrise" && "sunrise",
-      isNext ? "next" : started && "passed",
+      isNow && "now",
+      isNext ? "next" : started && !isNow && "passed",
     ].filter(Boolean).join(" ");
     const done = prayed.includes(name);
     const check = name === "Sunrise" ? "" : `
       <button class="pray-check${done ? " done" : ""}" data-prayer="${name}" type="button"
         aria-pressed="${done}" aria-label="Mark ${name} as prayed" ${started || done ? "" : "disabled"}
         title="${started || done ? `Mark ${name} as prayed` : `${name} hasn't started yet`}">${CHECK_ICON}</button>`;
+
+    const start = toSeconds(time);
+    const back = name === "Sunrise"
+      ? `<p class="back-title">Sunrise</p>
+         <p class="back-line">The Fajr time ends.</p>
+         <p class="back-line muted">No prayer is offered while the sun rises.</p>`
+      : `<p class="back-title">${name} window</p>
+         <p class="back-line">${fmt(start)} – ${fmt(windowEnd(name))}</p>
+         <p class="back-line muted">${formatSpan(windowEnd(name) - start)} long</p>
+         <p class="back-line">${PRAYER_FACTS[name]}</p>
+         ${name === "Isha" ? `<p class="back-line muted">Best before ${fmt(toSeconds(state.today.timings.Midnight) + (toSeconds(state.today.timings.Midnight) < 12 * 3600 ? DAY : 0))}</p>` : ""}`;
+
     return `<li class="${classes}">
-      <div><span class="name">${name}</span><span class="arabic" lang="ar">${ARABIC[name]}</span></div>
-      <span class="time">${clock}<small>${suffix}</small></span>
+      <div class="tile">
+        <div class="face front">
+          <div class="tile-top">
+            <svg class="sky-icon" viewBox="0 0 24 24" aria-hidden="true">${SKY_ICONS[name]}</svg>
+            ${isNow ? `<span class="now-badge">Now</span>` : isNext ? `<span class="next-badge">Next</span>` : ""}
+          </div>
+          <div class="prayer-name"><span class="name">${name}</span><span class="arabic" lang="ar">${ARABIC[name]}</span></div>
+          <span class="time">${clock}<small>${suffix}</small></span>
+          ${isNow ? `<div class="window" aria-label="Time left to pray ${name}">
+              <div class="window-bar"><span></span></div>
+              <span class="window-left"></span>
+            </div>` : ""}
+        </div>
+        <div class="face back" aria-hidden="true">${back}</div>
+      </div>
       ${check}
     </li>`;
   }).join("");
+  updateWindow();
+}
+
+// Live progress of the current prayer's time
+function updateWindow() {
+  const current = currentWindow();
+  if ((current?.name ?? null) !== renderedWindow) return renderTimes();
+  if (!current) return;
+  const li = $("times").querySelector("li.now");
+  if (!li) return;
+  const total = current.end - current.start;
+  const left = current.end - current.now;
+  li.querySelector(".window-bar span").style.width = `${(((total - left) / total) * 100).toFixed(2)}%`;
+  li.querySelector(".window-left").textContent = `${formatSpan(left)} left`;
 }
 
 // ---------- Prayer tracker ----------
@@ -500,18 +585,18 @@ function renderArc() {
     </defs>
     <ellipse class="horizon-glow ${m.mode}" cx="${glowX.toFixed(1)}" cy="${SKY.horizon}" rx="260" ry="95" fill="url(#horizon-glow)" />
     <rect class="horizon" x="0" y="${SKY.horizon - 0.5}" width="1000" height="1" fill="url(#horizon-fade)" />
-    <text class="horizon-label" x="996" y="${SKY.horizon - 6}">Horizon</text>
+    <text class="horizon-label" x="500" y="${SKY.horizon + 18}">Horizon</text>
     <path class="arc-track" d="${skyPath(m, m.start, m.end)}" />
     <path id="arc-done" class="arc-done" />
     ${markers}
     <g id="sun" class="indicator ${m.mode === "night" ? "is-moon" : "is-sun"}">
       ${m.mode === "night"
-        ? `<circle r="30" fill="url(#moon-glow)" /><circle class="moon-core" r="9" mask="url(#crescent)" />`
+        ? `<circle class="moon-halo" r="30" fill="url(#moon-glow)" /><circle class="moon-core" r="9" mask="url(#crescent)" />`
         : `<circle class="sun-halo" r="30" fill="url(#sun-glow)" />
            <g class="sun-rays">${Array.from({ length: 8 }, (_, i) => `<line y1="-13" y2="-17.5" transform="rotate(${i * 45})" />`).join("")}</g>
            <circle class="sun-core" r="8" />`}
     </g>
-    <g id="now-tag" class="now-tag"><rect x="-38" y="-14" width="76" height="22" rx="11" /><text y="1.5"></text></g>`;
+    <g id="now-tag" class="now-tag"><rect x="-44" y="-13" width="88" height="26" rx="13" /><text y="0.5"></text></g>`;
 
   // Draw in: the travelled path and the sun/moon glide from the start to "now"
   skyIntro = reduceMotion ? null : { startedAt: performance.now() };
@@ -546,7 +631,7 @@ function updateSun() {
   $("sun").classList.toggle("below", m.altitude(shown) < 0);
 
   // "Now" tag rides above the sun/moon, kept inside the card
-  const tagX = Math.min(Math.max(x, 48), 952);
+  const tagX = Math.min(Math.max(x, 54), 946);
   $("now-tag").setAttribute("transform", `translate(${tagX.toFixed(1)} ${(y - 40).toFixed(1)})`);
   $("now-tag").querySelector("text").textContent = `Now ${fmt(m.now)}`;
 
@@ -580,6 +665,7 @@ function startCountdown() {
       renderArc();
     } else {
       updateSun();
+      updateWindow();
     }
   };
   tick();

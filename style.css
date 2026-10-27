@@ -573,8 +573,8 @@ body.has-player .toast { bottom: 104px; }
   line-height: 0.95;
   text-shadow: 0 2px 30px rgba(0, 0, 0, 0.18);
 }
-.countdown { margin: 14px 0 0; font-family: var(--mono); font-size: 22px; font-variant-numeric: tabular-nums; }
-.countdown .muted { margin-left: 8px; font-size: 15px; }
+.countdown { margin: 14px 0 0; font-family: var(--sans); font-size: 26px; font-weight: 300; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.countdown .muted { margin-left: 10px; font-size: 15px; font-weight: 400; letter-spacing: 0; }
 
 /* Next prayer name turns over in 3D when it changes */
 .flip-in { animation: flip-in 0.8s var(--ease) both; transform-origin: 50% 70%; }
@@ -587,7 +587,7 @@ body.has-player .toast { bottom: 104px; }
 
 .arc { display: block; width: 100%; height: auto; margin-top: 24px; overflow: visible; }
 .arc .horizon { opacity: 0.4; }
-.arc .horizon-label { fill: rgba(251, 246, 234, 0.4); font-family: var(--sans); font-size: 11px; letter-spacing: 0.1em; text-anchor: end; text-transform: uppercase; }
+.arc .horizon-label { fill: rgba(251, 246, 234, 0.32); font-family: var(--sans); font-size: 10.5px; font-weight: 500; letter-spacing: 0.18em; text-anchor: middle; text-transform: uppercase; }
 .arc .arc-track { fill: none; stroke: rgba(251, 246, 234, 0.3); stroke-width: 1.5; stroke-dasharray: 2 6; stroke-linecap: round; }
 .arc .arc-done { fill: none; stroke: rgba(251, 246, 234, 0.92); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(255, 230, 180, 0.35)); }
 
@@ -603,8 +603,8 @@ body.has-player .toast { bottom: 104px; }
 .arc .marker.passed circle { fill: rgba(251, 246, 234, 0.55); }
 .arc .marker.passed.minor circle { fill: none; }
 .arc .marker.next circle { fill: #f2cd85; }
-.arc .marker text { fill: rgba(251, 246, 234, 0.82); font-family: var(--sans); font-size: 14px; text-anchor: middle; }
-.arc .marker .marker-time { fill: rgba(251, 246, 234, 0.5); font-family: var(--mono); font-size: 12px; }
+.arc .marker text { fill: rgba(251, 246, 234, 0.85); font-family: var(--sans); font-size: 14.5px; font-weight: 500; letter-spacing: -0.005em; text-anchor: middle; }
+.arc .marker .marker-time { fill: rgba(251, 246, 234, 0.55); font-family: var(--sans); font-size: 12.5px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .arc .marker.next text { fill: #f2cd85; font-weight: 600; }
 .arc .marker.next .marker-time { fill: rgba(242, 205, 133, 0.8); font-weight: 400; }
 .arc .marker .ping {
@@ -629,10 +629,11 @@ body.has-player .toast { bottom: 104px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .indicator.is-sun.below .sun-core { fill: #ffcf9e; }
 .indicator.is-sun.below .sun-rays { opacity: 0.35; }
-.moon-core { fill: #f4ead2; filter: drop-shadow(0 0 6px rgba(223, 230, 255, 0.6)); }
+.moon-core { fill: #f4ead2; }
+.moon-halo { animation: breathe 5s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 
-.now-tag rect { fill: rgba(10, 14, 30, 0.45); stroke: rgba(251, 246, 234, 0.22); }
-.now-tag text { fill: #fbf6ea; font-family: var(--mono); font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
+.now-tag rect { fill: rgba(10, 14, 30, 0.5); stroke: rgba(251, 246, 234, 0.2); }
+.now-tag text { fill: #fbf6ea; font-family: var(--sans); font-size: 12.5px; font-weight: 500; font-variant-numeric: tabular-nums; text-anchor: middle; dominant-baseline: central; }
 
 /* Live status under the sky path */
 .sky-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; padding-bottom: 8px; }
@@ -705,25 +706,85 @@ body.has-player .toast { bottom: 104px; }
   list-style: none;
   overflow: hidden;
 }
-.times li { position: relative; padding: 24px 20px 28px; border-right: 1px solid var(--line); transition: background-color 0.3s; }
+.times li {
+  position: relative;
+  border-right: 1px solid var(--line);
+  perspective: 900px;
+  transition: background-color 0.3s;
+}
 .times li:last-child { border-right: none; }
-.times .name { font-weight: 500; }
-.times .arabic { display: block; margin-top: 2px; font-family: var(--arabic); font-size: 15px; color: var(--muted); }
-.times .time { display: block; margin-top: 22px; font-family: var(--mono); font-size: 24px; font-variant-numeric: tabular-nums; }
-.times .time small { margin-left: 4px; font-size: 12px; color: var(--muted); }
+
+/* Each prayer is a two-sided tile: times on the front, details on the back */
+.tile { display: grid; height: 100%; transform-style: preserve-3d; transition: transform 0.75s var(--ease); }
+.face { grid-area: 1 / 1; display: flex; flex-direction: column; padding: 20px 20px 22px; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.face.back { justify-content: center; gap: 3px; background: var(--surface-2); transform: rotateY(180deg); }
+
+.tile-top { display: flex; align-items: center; gap: 8px; height: 28px; margin-bottom: 14px; }
+.sky-icon { flex: none; width: 26px; height: 26px; fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.3s; }
+.now-badge, .next-badge { padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.now-badge { background: var(--gold); color: var(--bg); }
+.next-badge { border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); color: var(--gold); }
+
+.times .prayer-name { display: grid; gap: 1px; }
+.times .name { font-size: 15.5px; font-weight: 500; letter-spacing: -0.005em; }
+.times .arabic { font-family: var(--arabic); font-size: 14px; line-height: 1.5; color: var(--muted); }
+.times .time {
+  margin-top: 18px;
+  font-family: var(--sans);
+  font-size: 31px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+.times .time small { margin-left: 5px; font-size: 11.5px; font-weight: 500; letter-spacing: 0.06em; color: var(--muted); }
+
 .times li.passed .name,
 .times li.passed .time { color: var(--muted); }
 .times li.sunrise .name { color: var(--muted); font-weight: 400; }
-.times li.next { background: linear-gradient(180deg, var(--gold-soft), transparent 70%); }
-.times li.next::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--gold); }
+
+.times li.next::before { content: ""; position: absolute; top: 0; left: 0; right: 0; z-index: 2; height: 3px; background: var(--gold); }
 .times li.next .name,
-.times li.next .time { color: var(--gold); }
+.times li.next .time,
+.times li.next .sky-icon { color: var(--gold); stroke: var(--gold); }
+.times li.now .front { background: linear-gradient(180deg, var(--gold-soft), transparent 75%); }
+.times li.now .sky-icon { stroke: var(--gold); }
+
+/* Live share of the current prayer's time that has passed */
+.window { margin-top: 16px; }
+.window-bar { height: 4px; overflow: hidden; background: var(--line); border-radius: 999px; }
+.window-bar span { display: block; height: 100%; width: 0; background: var(--gold); border-radius: 999px; transition: width 1s linear; }
+.window-left { display: block; margin-top: 7px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+.back-title { margin-bottom: 4px; color: var(--gold); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.back-line { font-size: 13.5px; line-height: 1.45; font-variant-numeric: tabular-nums; }
+
+/* Icon motion for the prayer that is now, and the one that is next */
+.sky-icon .rays, .sky-icon .twinkle { transform-box: fill-box; transform-origin: center; }
+li.now .sky-icon .rays, li.next .sky-icon .rays { animation: glint 2.6s ease-in-out infinite; }
+li.now .sky-icon .twinkle, li.next .sky-icon .twinkle { animation: glint 2s ease-in-out infinite; }
+li.now .sky-icon .lift, li.next .sky-icon .lift { animation: lift 2.4s var(--ease) infinite; }
+li.now .sky-icon .sink, li.next .sky-icon .sink { animation: sink 2.4s var(--ease) infinite; }
+li.now .sky-icon .shadow, li.next .sky-icon .shadow { animation: glint 3s ease-in-out infinite; }
+@keyframes glint { 50% { opacity: 0.25; } }
+@keyframes lift { 0% { transform: translateY(2px); opacity: 0; } 40% { opacity: 1; } 100% { transform: translateY(-1.5px); opacity: 0; } }
+@keyframes sink { 0% { transform: translateY(-2px); opacity: 0; } 40% { opacity: 1; } 100% { transform: translateY(1.5px); opacity: 0; } }
+
+/* Hover a prayer to turn it over (desktop only) */
+@media (hover: hover) and (pointer: fine) {
+  .times li:hover .tile { transform: rotateY(180deg); transition-delay: 0.12s; }
+}
+@media (hover: none), (pointer: coarse) {
+  .face.back { display: none; }
+}
 
 /* Tick on each prayer in today's list */
 .pray-check {
   position: absolute;
   top: 20px;
   right: 16px;
+  z-index: 3;
   display: grid;
   place-items: center;
   width: 28px;
@@ -1254,18 +1315,33 @@ body.has-player main { padding-bottom: 96px; }
   .times { grid-template-columns: 1fr; }
   .times li {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto;
     align-items: center;
-    gap: 14px;
-    padding: 15px 18px;
+    gap: 12px;
+    padding-right: 16px;
     border-right: none;
     border-bottom: 1px solid var(--line);
+    perspective: none;
   }
   .times li:last-child { border-bottom: none; }
-  .times .arabic { display: inline; margin: 0 0 0 10px; }
-  .times .time { margin-top: 0; font-size: 20px; }
-  .times li.next { background: linear-gradient(90deg, var(--gold-soft), transparent 80%); }
+  .tile { transform: none !important; }
+  .face.back { display: none; }
+  .face.front {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: "icon name time" "win win win";
+    align-items: center;
+    column-gap: 12px;
+    padding: 14px 0 14px 16px;
+  }
+  .tile-top { grid-area: icon; height: auto; margin: 0; }
+  .tile-top .now-badge, .tile-top .next-badge { display: none; }
+  .sky-icon { width: 24px; height: 24px; }
+  .times .prayer-name { grid-area: name; display: flex; align-items: baseline; gap: 8px; }
+  .times .time { grid-area: time; margin-top: 0; font-size: 22px; }
+  .window { grid-area: win; margin-top: 10px; }
   .times li.next::before { top: 0; bottom: 0; right: auto; width: 3px; height: auto; }
+  .times li.now .front { background: linear-gradient(90deg, var(--gold-soft), transparent 85%); }
   .pray-check { position: static; }
 
   .tracker { grid-template-columns: 1fr; grid-template-areas: "title" "stats" "grid" "note"; gap: 20px; padding: 24px 18px; }
