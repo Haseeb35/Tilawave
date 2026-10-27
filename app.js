@@ -380,24 +380,41 @@ function qiblaDirection(lat, lng) {
   return (Math.atan2(y, x) / rad + 360) % 360;
 }
 
-function drawTicks() {
-  const ticks = [];
-  for (let deg = 0; deg < 360; deg += 5) {
-    const major = deg % 30 === 0;
-    const inner = major ? 84 : 89;
-    ticks.push(
-      `<line class="tick${major ? " major" : ""}" y1="-${inner}" y2="-94" transform="rotate(${deg})" />`
-    );
+const CARDINALS = { 0: "N", 90: "E", 180: "S", 270: "W" };
+
+// Compass graduations: a tick every 2°, longer every 10°, bold every 30°,
+// with N/E/S/W and degree numbers in between.
+function drawDial() {
+  const parts = [];
+  for (let deg = 0; deg < 360; deg += 2) {
+    const cls = deg % 30 === 0 ? "major" : deg % 10 === 0 ? "mid" : "";
+    const len = deg % 30 === 0 ? 12 : deg % 10 === 0 ? 8 : 4;
+    parts.push(`<line class="tick ${cls}" y1="-104" y2="${-104 + len}" transform="rotate(${deg})" />`);
   }
-  $("ticks").innerHTML = ticks.join("");
+  for (let deg = 0; deg < 360; deg += 30) {
+    const a = (deg * Math.PI) / 180;
+    const x = (80 * Math.sin(a)).toFixed(1);
+    const y = (-80 * Math.cos(a)).toFixed(1);
+    const cls = deg === 0 ? "cardinal north" : CARDINALS[deg] ? "cardinal" : "degree";
+    parts.push(`<text class="${cls}" x="${x}" y="${y}">${CARDINALS[deg] ?? deg}</text>`);
+  }
+  $("ticks").innerHTML = parts.join("");
 }
 
 function renderQibla(heading = 0) {
   if (state.qibla == null) return;
-  $("qibla-deg").textContent = `${state.qibla.toFixed(1)}°`;
+  const q = state.qibla;
+  $("qibla-deg").textContent = `${q.toFixed(1)}°`;
   // Rotate the dial opposite to the phone's heading so N stays pointing north.
   $("dial").setAttribute("transform", `rotate(${-heading})`);
-  $("needle").setAttribute("transform", `rotate(${state.qibla})`);
+  $("needle").setAttribute("transform", `rotate(${q})`);
+  // Keep the Kaaba upright relative to the dial.
+  $("kaaba").setAttribute("transform", `translate(0 -57) rotate(${-q})`);
+  // Arc along the face from North to the Qibla bearing
+  const a = (q * Math.PI) / 180;
+  const x = (68 * Math.sin(a)).toFixed(2);
+  const y = (-68 * Math.cos(a)).toFixed(2);
+  $("qibla-arc").setAttribute("d", `M0 -68 A68 68 0 ${q > 180 ? 1 : 0} 1 ${x} ${y}`);
 }
 
 const compass = { on: false, event: null, gotReading: false, timer: null };
@@ -520,7 +537,7 @@ for (const id of ["method", "school"]) {
 // ---------- Start ----------
 
 (function init() {
-  drawTicks();
+  drawDial();
   renderThemeButton();
 
   const saved = loadSettings();

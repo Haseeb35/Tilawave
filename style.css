@@ -382,23 +382,38 @@ body.loading main { opacity: 0.45; }
 }
 .outline-btn:hover { background: var(--ink); color: var(--bg); }
 
-.compass { width: 100%; max-width: 320px; justify-self: center; overflow: visible; }
-.compass .ring { fill: var(--bg); stroke: var(--line); stroke-width: 1; }
-.compass .tick { stroke: var(--muted); stroke-width: 1; }
-.compass .tick.major { stroke: var(--ink); stroke-width: 1.5; }
+.compass { width: 100%; max-width: 340px; justify-self: center; overflow: visible; }
+.compass .bezel {
+  fill: var(--surface);
+  stroke: var(--line);
+  stroke-width: 1;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.12));
+}
+.compass .face { fill: var(--bg); stroke: var(--line); stroke-width: 1; }
+.compass .tick { stroke: var(--muted); stroke-width: 0.8; opacity: 0.7; }
+.compass .tick.mid { stroke: var(--ink); stroke-width: 1.1; opacity: 0.75; }
+.compass .tick.major { stroke: var(--ink); stroke-width: 1.8; opacity: 1; }
+.compass text { text-anchor: middle; dominant-baseline: central; }
 .compass .cardinal {
   font-family: var(--sans);
-  font-size: 11px;
-  font-weight: 500;
-  fill: var(--muted);
-  text-anchor: middle;
-  dominant-baseline: middle;
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--ink);
 }
-.compass .cardinal.north { fill: var(--ink); }
-.compass .pointer { fill: var(--ink); }
-.compass .needle-line { stroke: var(--gold); stroke-width: 2; }
-.compass .kaaba { fill: var(--ink); stroke: var(--gold); stroke-width: 1.5; }
-.compass .hub { fill: var(--gold); }
+.compass .cardinal.north { fill: var(--gold); }
+.compass .degree {
+  font-family: var(--mono);
+  font-size: 8px;
+  fill: var(--muted);
+}
+.compass .pointer { fill: var(--gold); }
+.compass .qibla-arc { fill: none; stroke: var(--gold); stroke-width: 2.5; stroke-linecap: round; opacity: 0.85; }
+.compass .needle-front { fill: var(--gold); }
+.compass .needle-back { fill: var(--muted); opacity: 0.55; }
+.compass #kaaba rect { fill: #17171c; stroke: var(--gold); stroke-width: 1; }
+.compass #kaaba line { stroke: var(--gold); stroke-width: 1.6; }
+.compass .hub { fill: var(--ink); }
+.compass .hub-dot { fill: var(--gold); }
 
 /* ---------- Footer ---------- */
 

@@ -88,20 +88,23 @@
         <button id="compass-btn" class="outline-btn" type="button">Enable live compass</button>
         <p id="compass-note" class="muted small">On a phone, hold the device flat and turn until the marker reaches the top.</p>
       </div>
-      <svg class="compass" viewBox="-110 -110 220 220" role="img" aria-label="Qibla compass">
-        <path class="pointer" d="M0 -108 L5 -100 L-5 -100 Z" />
+      <svg class="compass" viewBox="-124 -124 248 248" role="img" aria-label="Qibla compass">
+        <path class="pointer" d="M0 -113 L6 -123 L-6 -123 Z" />
         <g id="dial">
-          <circle class="ring" r="96" />
+          <circle class="bezel" r="112" />
           <g id="ticks"></g>
-          <text class="cardinal north" y="-70">N</text>
-          <text class="cardinal" x="72" y="4">E</text>
-          <text class="cardinal" y="78">S</text>
-          <text class="cardinal" x="-72" y="4">W</text>
+          <circle class="face" r="68" />
+          <path id="qibla-arc" class="qibla-arc" />
           <g id="needle">
-            <line class="needle-line" y1="0" y2="-80" />
-            <rect class="kaaba" x="-6" y="-94" width="12" height="12" />
+            <path class="needle-front" d="M0 -48 L6 0 L-6 0 Z" />
+            <path class="needle-back" d="M6 0 L-6 0 L0 20 Z" />
+            <g id="kaaba" transform="translate(0 -57)">
+              <rect x="-6.5" y="-6.5" width="13" height="13" rx="1.5" />
+              <line x1="-6.5" x2="6.5" y1="-2" y2="-2" />
+            </g>
           </g>
-          <circle class="hub" r="3.5" />
+          <circle class="hub" r="5" />
+          <circle class="hub-dot" r="2" />
         </g>
       </svg>
     </section>
