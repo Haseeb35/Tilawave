@@ -2,6 +2,28 @@
 
 A calm, mobile-friendly Islamic companion site: prayer times for any city, the Qibla direction, the Holy Quran with translations, tafsir and recitation, a hadith library, Quranic duas and the 99 Names, a zakat calculator, a tasbih counter and an Islamic calendar.
 
+## Screenshots
+
+![Home page: next prayer countdown with the live night sky over Lahore](docs/screenshots/home.jpg)
+
+| Today's prayer times | Quran reader with tafsir (dark mode) |
+|---|---|
+| ![Prayer time cards with an icon for each prayer, ticks for prayers marked as prayed, and the time left for Isha](docs/screenshots/prayer-times.jpg) | ![Ayat al-Kursi with Ibn Kathir's tafsir open in the side panel](docs/screenshots/quran-tafsir.jpg) |
+| **Hadith library** | **Quranic duas (dark mode)** |
+| ![Ten hadith collections with Arabic titles and counts](docs/screenshots/hadith.jpg) | ![Duas with Arabic, transliteration, English and Urdu translation](docs/screenshots/duas.jpg) |
+
+| Zakat calculator |
+|---|
+| ![Zakat calculator with live gold and silver prices and the amount due](docs/screenshots/zakat.jpg) |
+
+**On phones**
+
+<p>
+  <img src="docs/screenshots/mobile-home.jpg" width="260" alt="Home page on a phone in dark mode">
+  <img src="docs/screenshots/mobile-quran.jpg" width="260" alt="Surah Al-Mulk in the reader on a phone, with the recitation player">
+  <img src="docs/screenshots/mobile-settings.jpg" width="260" alt="Settings page on a phone">
+</p>
+
 ## Features
 
 ### Prayer times (`index.html`)
@@ -123,6 +145,7 @@ Plain HTML, CSS and JavaScript, with no framework, no dependencies and no build 
 ├── manifest.webmanifest        Install-as-app metadata
 ├── data/hadith-books.json      Book index for the hadith collections
 ├── icons/                      Logo, app icons, link-preview image
+├── docs/screenshots/           Images used in this README
 └── tests/                      End-to-end tests (headless Chrome)
 ```
 
