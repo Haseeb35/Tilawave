@@ -293,7 +293,7 @@ function renderHeader() {
   const hijri = hijriFor(y, m, d);
   $("location").textContent = state.place.label;
   $("dates").innerHTML =
-    `${date.gregorian.weekday.en}, ${date.readable}` +
+    `${escapeHtml(date.gregorian.weekday.en)}, ${escapeHtml(date.readable)}` +
     `<span class="hijri">${hijriLabel(hijri)}</span>`;
 
   // During Ramadan, show when Sehri ends (Fajr) and Iftar begins (Maghrib).
@@ -517,7 +517,7 @@ function renderQada() {
   const total = FARD.reduce((sum, p) => sum + (counts[p] || 0), 0);
   $("qada-total").textContent = `${total.toLocaleString()} prayer${total === 1 ? "" : "s"}`;
   $("qada-list").innerHTML = FARD.map((p) => {
-    const n = counts[p] || 0;
+    const n = Math.max(0, Math.floor(Number(counts[p]))) || 0;
     return `<li>
       <span class="qada-name">${p}</span>
       <span class="qada-count">${n}</span>
@@ -677,7 +677,7 @@ const KAHF = 18;
 
 function jummahNote() {
   if (new Date().getDay() !== 5) return null;
-  const last = readStore("quran-last-read", null);
+  const last = readLastRead();
   const reading = last && !last.juz && last.surah === KAHF && last.ayah > 1;
   return {
     title: "It's Jummah",
@@ -756,7 +756,7 @@ function mulkNote() {
 function renderNotes() {
   const notes = [jummahNote(), fastingNote(), readingNote(), trackerNote(), mulkNote()].filter(Boolean);
   $("today-notes").innerHTML = notes.map((n) => `
-    <a class="note card" href="${n.href}">
+    <a class="note card" href="${escapeHtml(n.href)}">
       <span class="eyebrow">${escapeHtml(n.title)}</span>
       <span class="note-text">${escapeHtml(n.text)}</span>
       <span class="note-action">${escapeHtml(n.action)} →</span>
@@ -882,11 +882,17 @@ function drawStars() {
   if (!field || field.childElementCount) return;
   let seed = 7;
   const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  field.innerHTML = Array.from({ length: 46 }, () => {
+  // Styles are set through the DOM, since the Content Security Policy blocks inline style attributes.
+  for (let i = 0; i < 46; i++) {
     const size = rand() < 0.15 ? 2.5 : 1.5;
-    return `<i style="left:${(rand() * 100).toFixed(1)}%;top:${(rand() * 62).toFixed(1)}%;width:${size}px;height:${size}px;` +
-      `animation-delay:${(rand() * 6).toFixed(2)}s;animation-duration:${(3 + rand() * 4).toFixed(2)}s"></i>`;
-  }).join("") + `<b class="shooting-star"></b>`;
+    const star = document.createElement("i");
+    Object.assign(star.style, {
+      left: `${(rand() * 100).toFixed(1)}%`, top: `${(rand() * 62).toFixed(1)}%`, width: `${size}px`, height: `${size}px`,
+      animationDelay: `${(rand() * 6).toFixed(2)}s`, animationDuration: `${(3 + rand() * 4).toFixed(2)}s`,
+    });
+    field.append(star);
+  }
+  field.append(Object.assign(document.createElement("b"), { className: "shooting-star" }));
 }
 
 let sky = null;           // the current model

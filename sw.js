@@ -1,6 +1,6 @@
 // Service worker: makes the site installable and keeps it working offline.
 // Bump CACHE when the app shell changes so old files are cleared.
-const CACHE = "tilawave-v6";
+const CACHE = "tilawave-v7";
 
 const SHELL = [
   "./",
@@ -15,6 +15,7 @@ const SHELL = [
   "offline.html",
   "404.html",
   "style.css",
+  "theme.js",
   "common.js",
   "app.js",
   "quran.js",

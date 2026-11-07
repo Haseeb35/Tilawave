@@ -31,6 +31,16 @@ function readStore(key, fallback) {
   }
 }
 
+// Stored data can come from an imported backup file, so check its shape before use.
+const isWhole = (n) => Number.isInteger(n) && n > 0;
+
+function readLastRead() {
+  const last = readStore("quran-last-read", null);
+  if (!last || !isWhole(last.surah) || !isWhole(last.ayah)) return null;
+  if (last.juz != null && !isWhole(last.juz)) return null;
+  return last;
+}
+
 function writeStore(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -799,6 +809,9 @@ reveal(document.querySelectorAll("main > section, main > .card, main > .place-ba
 tilt(document.querySelectorAll("[data-tilt]"));
 
 // ---------- Installable app & offline ----------
+
+// The offline page's "Try again" button (wired here: the Content Security Policy blocks inline handlers)
+$("reload-btn")?.addEventListener("click", () => location.reload());
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {

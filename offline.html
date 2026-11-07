@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob:; media-src 'self' https: blob:; connect-src 'self' https://api.aladhan.com https://geocoding-api.open-meteo.com https://api.alquran.cloud https://api.quran.com https://cdn.jsdelivr.net https://raw.githubusercontent.com https://api.bigdatacloud.net https://api-bdc.io https://overpass-api.de https://maps.mail.ru https://nominatim.openstreetmap.org https://latest.currency-api.pages.dev; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Offline — Tilawave</title>
   <meta name="description" content="You are offline.">
@@ -17,12 +18,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Amiri+Quran&family=Noto+Nastaliq+Urdu:wght@400&display=swap" rel="stylesheet" crossorigin>
   <link rel="stylesheet" href="style.css">
-  <script>
-    try {
-      const theme = localStorage.getItem("theme");
-      if (theme) document.documentElement.dataset.theme = theme;
-    } catch {}
-  </script>
+  <script src="theme.js"></script>
 </head>
 <body data-page="offline">
   <header class="topbar">
@@ -56,7 +52,7 @@
     <p class="status-code">Offline</p>
     <h1>You're offline</h1>
     <p class="muted">This page hasn't been saved for offline use yet. Pages you've opened before still work, and this one will load when you're back online.</p>
-    <button class="outline-btn" type="button" onclick="location.reload()">Try again</button>
+    <button class="outline-btn" type="button" id="reload-btn">Try again</button>
     <nav class="status-links" aria-label="Main sections">
       <a class="card" href="./"><strong>Prayer times</strong><span class="muted small">Today's times and Qibla</span></a>
       <a class="card" href="quran.html"><strong>Quran</strong><span class="muted small">Read, listen and search</span></a>

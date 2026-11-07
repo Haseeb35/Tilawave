@@ -212,7 +212,7 @@ await test("Share previews and 404/offline pages", async () => {
 await test("Offline: an unsaved page shows the offline page", async () => {
   await go(BASE);
   await waitFor(`navigator.serviceWorker.controller !== null`, 20000).catch(async () => { await go(BASE); await waitFor(`navigator.serviceWorker.controller !== null`, 20000); });
-  await waitFor(`caches.open("tilawave-v6").then(c => c.match("offline.html")).then(Boolean)`, 20000);
+  await waitFor(`caches.open("tilawave-v7").then(c => c.match("offline.html")).then(Boolean)`, 20000);
   const r = await evaluate(`fetch("never-visited-page.html", { mode: "navigate" }).then(r => r.status).catch(e => "err")`);
   // A navigate fetch can't be simulated from script; check the worker's code path instead
   const sw = await evaluate(`fetch("sw.js").then(r => r.text())`);

@@ -62,7 +62,7 @@ function paraRanges(starts, surahs) {
   });
 }
 
-const getBookmarks = () => readStore(BOOKMARKS_KEY, []) || [];
+const getBookmarks = () => [].concat(readStore(BOOKMARKS_KEY, []) || []).filter((b) => isWhole(b?.surah) && isWhole(b?.ayah));
 const isBookmarked = (surah, ayah) => getBookmarks().some((b) => b.surah === surah && b.ayah === ayah);
 
 function toggleBookmark(entry) {
@@ -197,7 +197,7 @@ $("khatam-new").addEventListener("click", () => {
 
 // ---------- Hifz (memorisation) ----------
 
-const getHifz = () => new Set(readStore(HIFZ_KEY, []) || []);
+const getHifz = () => new Set([].concat(readStore(HIFZ_KEY, []) || []).filter((n) => isWhole(n) && n <= 114));
 
 function toggleHifz(surah) {
   const set = getHifz();
@@ -292,7 +292,7 @@ function continueLink(last) {
 }
 
 function renderContinue() {
-  const last = readStore(LAST_READ_KEY, null);
+  const last = readLastRead();
   if (!last) return;
   const el = $("continue");
   el.href = continueLink(last);
@@ -386,7 +386,7 @@ function renderParaList() {
 
 let searchId = 0;
 
-const recentSearches = () => readStore(SEARCHES_KEY, []) || [];
+const recentSearches = () => [].concat(readStore(SEARCHES_KEY, []) || []).filter((s) => typeof s?.q === "string" && typeof s.lang === "string");
 
 function renderRecentSearches() {
   const list = recentSearches();
