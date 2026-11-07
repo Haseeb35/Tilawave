@@ -119,7 +119,7 @@ await test("Service worker installs and controls the page", async () => {
   await waitFor(`navigator.serviceWorker.ready.then(() => true)`);
   await go(BASE);
   await waitFor(`!!navigator.serviceWorker.controller`);
-  const cached = await evaluate(`caches.open("tilawave-v6").then(c => c.keys()).then(k => k.length)`);
+  const cached = await evaluate(`caches.open("tilawave-v7").then(c => c.keys()).then(k => k.length)`);
   console.log(`       controller: ${await evaluate(`navigator.serviceWorker.controller.scriptURL`)} · ${cached} cached files`);
   expect(cached >= 24, "app shell not cached");
 });

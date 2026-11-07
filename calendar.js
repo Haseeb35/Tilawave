@@ -126,7 +126,7 @@ function renderMonth(days) {
     const isFriday = date.gregorian.weekday.en === "Friday";
     const cls = [isToday && "today", isFriday && "friday"].filter(Boolean).join(" ");
     return `<tr class="${cls}">
-      <th scope="row">${date.gregorian.weekday.en.slice(0, 3)} ${Number(date.gregorian.day)}</th>
+      <th scope="row">${escapeHtml(date.gregorian.weekday.en.slice(0, 3))} ${Number(date.gregorian.day)}</th>
       <td class="hijri">${hijriCell(date.gregorian.date)}</td>
       ${PRAYER_COLUMNS.map((p) => `<td>${to12h(timings[p]).join(" ")}</td>`).join("")}
     </tr>`;
